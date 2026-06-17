@@ -1,0 +1,168 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+// ---------------------------
+// DATA MODELS
+// ---------------------------
+
+export interface User {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  email: string;
+}
+
+export interface Attendee {
+  initials: string;
+  name: string;
+  color: string;
+}
+
+export interface ActionItem {
+  id: string;
+  task: string;
+  assignee: Attendee;
+  due: string;
+  done: boolean;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  duration: string;
+  status: 'scheduled' | 'active' | 'completed';
+  summary?: string;
+  actionItems: ActionItem[];
+  attendees: Attendee[];
+  transcript?: { speaker: string; text: string; time?: string }[];
+  chat?: { sender: string; initials: string; color: string; text: string; time: string }[];
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  status: 'backlog' | 'in-progress' | 'in-review' | 'done';
+  assignee: Attendee;
+  priority: 'high' | 'medium' | 'low';
+  due: string;
+  sourceMeetingId?: string;
+  sourceMeetingTitle?: string;
+}
+
+// ---------------------------
+// AUTH STORE
+// ---------------------------
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string) => void;
+  logout: () => void;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      login: (email) =>
+        set({
+          user: {
+            id: '1',
+            name: 'Sarah Anderson',
+            initials: 'SA',
+            color: '#4F46E5',
+            email,
+          },
+          isAuthenticated: true,
+        }),
+      logout: () => set({ user: null, isAuthenticated: false }),
+    }),
+    { name: 'intellmeet-auth' }
+  )
+);
+
+// ---------------------------
+// MEETINGS STORE
+// ---------------------------
+const MOCK_MEETINGS: Meeting[] = [
+  {
+    id: 'm1',
+    title: 'Product Roadmap Sync',
+    date: 'Today, 10:00 AM',
+    duration: '48 min',
+    status: 'completed',
+    summary: 'Decided to prioritize the mobile app launch for Q3. API rate limiting discussion tabled to next sprint.',
+    actionItems: [
+      { id: 'a1', task: 'Draft Q3 mobile launch communication', assignee: { initials: 'SA', name: 'Sarah Anderson', color: '#4F46E5' }, due: 'Jun 12', done: true },
+    ],
+    attendees: [
+      { initials: 'SA', name: 'Sarah Anderson', color: '#4F46E5' },
+      { initials: 'MK', name: 'Marcus Kim', color: '#10B981' },
+      { initials: 'JL', name: 'Julia Liu', color: '#F59E0B' }
+    ],
+  },
+  {
+    id: 'm2',
+    title: 'Q3 Planning & Roadmap Review',
+    date: 'Tomorrow, 2:00 PM',
+    duration: '60 min',
+    status: 'scheduled',
+    summary: '',
+    actionItems: [],
+    attendees: [
+      { initials: 'SA', name: 'Sarah Anderson', color: '#4F46E5' },
+      { initials: 'MK', name: 'Marcus Kim', color: '#10B981' },
+      { initials: 'JL', name: 'Julia Liu', color: '#F59E0B' },
+      { initials: 'RD', name: 'Ryan Davis', color: '#EF4444' }
+    ],
+  }
+];
+
+interface MeetingsState {
+  meetings: Meeting[];
+  addMeeting: (meeting: Meeting) => void;
+  updateMeeting: (id: string, updates: Partial<Meeting>) => void;
+}
+
+export const useMeetingStore = create<MeetingsState>()(
+  persist(
+    (set) => ({
+      meetings: MOCK_MEETINGS,
+      addMeeting: (meeting) => set((state) => ({ meetings: [meeting, ...state.meetings] })),
+      updateMeeting: (id, updates) => set((state) => ({
+        meetings: state.meetings.map(m => m.id === id ? { ...m, ...updates } : m)
+      })),
+    }),
+    { name: 'intellmeet-meetings' }
+  )
+);
+
+// ---------------------------
+// TASKS STORE
+// ---------------------------
+const MOCK_TASKS: Task[] = [
+  { id: 't1', title: 'Implement SSO integration for enterprise accounts', sourceMeetingTitle: 'Client Discovery — Acme Corp', priority: 'high', assignee: { initials: 'RD', color: '#EF4444', name: 'Ryan Davis' }, due: 'Jun 17', status: 'backlog' },
+  { id: 't5', title: 'Mobile app — core auth flow testing', sourceMeetingTitle: 'Engineering Standup', priority: 'high', assignee: { initials: 'MK', color: '#10B981', name: 'Marcus Kim' }, due: 'Jun 14', status: 'in-progress' },
+  { id: 't10', title: 'Q3 stakeholder communication draft', sourceMeetingTitle: 'Q3 Planning Call', priority: 'low', assignee: { initials: 'SA', color: '#4F46E5', name: 'Sarah Anderson' }, due: 'Jun 12', status: 'done' },
+];
+
+interface TasksState {
+  tasks: Task[];
+  addTask: (task: Task) => void;
+  updateTaskStatus: (id: string, status: Task['status']) => void;
+}
+
+export const useTaskStore = create<TasksState>()(
+  persist(
+    (set) => ({
+      tasks: MOCK_TASKS,
+      addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
+      updateTaskStatus: (id, status) => set((state) => ({
+        tasks: state.tasks.map(t => t.id === id ? { ...t, status } : t)
+      })),
+    }),
+    { name: 'intellmeet-tasks' }
+  )
+);

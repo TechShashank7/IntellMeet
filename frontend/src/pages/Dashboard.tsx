@@ -1,34 +1,127 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/store';
-import { api } from '../lib/api';
 import { 
   Plus, 
   Calendar, 
-  Clock, 
   ArrowRight,
-  MoreVertical,
-  FileText
+  FileText,
+  Video,
+  LogIn,
+  MonitorUp,
+  Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+const upcomingMeetingsMock = [
+  {
+    id: '1',
+    title: 'Q3 Roadmap Sync',
+    date: 'Today',
+    time: '10:00 AM',
+    duration: '45m',
+    isToday: true,
+    attendees: [
+      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' },
+      { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
+      { name: 'Julia Liu', initials: 'JL', color: '#10B981' }
+    ]
+  },
+  {
+    id: '2',
+    title: 'Client Discovery — Acme Corp',
+    date: 'Today',
+    time: '1:00 PM',
+    duration: '1h',
+    isToday: true,
+    attendees: [
+      { name: 'Ryan Davis', initials: 'RD', color: '#F59E0B' },
+      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' }
+    ]
+  },
+  {
+    id: '3',
+    title: 'Design Review: Mobile App',
+    date: 'Tomorrow',
+    time: '11:30 AM',
+    duration: '30m',
+    isToday: false,
+    attendees: [
+      { name: 'Julia Liu', initials: 'JL', color: '#10B981' },
+      { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
+      { name: 'Ryan Davis', initials: 'RD', color: '#F59E0B' },
+      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' }
+    ]
+  },
+  {
+    id: '4',
+    title: 'Product Sync: Q4 Goals',
+    date: 'Tomorrow',
+    time: '2:00 PM',
+    duration: '45m',
+    isToday: false,
+    attendees: [
+      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' },
+      { name: 'Julia Liu', initials: 'JL', color: '#10B981' }
+    ]
+  }
+];
+
+const recentSummariesMock = [
+  {
+    id: '1',
+    title: 'Engineering Standup',
+    date: 'Today',
+    summary: 'Discussed API performance bottlenecks and assigned backend tasks for the upcoming sprint. Julia to investigate database indexes.',
+    actionItemsCount: 3
+  },
+  {
+    id: '2',
+    title: 'Marketing Weekly',
+    date: 'Yesterday',
+    summary: 'Reviewed Q2 campaign metrics. Content team is delayed on the new landing page copy. Marcus to follow up with the agency.',
+    actionItemsCount: 1
+  },
+  {
+    id: '3',
+    title: 'All Hands Q&A',
+    date: 'Yesterday',
+    summary: 'Leadership addressed questions about the remote work policy and announced the upcoming company retreat schedule.',
+    actionItemsCount: 0
+  }
+];
+
+const actionItemsMock = [
+  {
+    id: '1',
+    title: 'Update Q3 financial projections based on Acme Corp deal',
+    meeting: 'Client Discovery — Acme Corp',
+    assignee: { name: 'Shashank Raj', initials: 'SR', color: '#4F46E5' },
+    dueDate: 'Today',
+    isOverdue: false
+  },
+  {
+    id: '2',
+    title: 'Review and approve mobile app wireframes',
+    meeting: 'Design Review: Mobile App',
+    assignee: { name: 'Julia Liu', initials: 'JL', color: '#10B981' },
+    dueDate: 'Yesterday',
+    isOverdue: true
+  },
+  {
+    id: '3',
+    title: 'Send database index report to engineering channel',
+    meeting: 'Engineering Standup',
+    assignee: { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
+    dueDate: 'Tomorrow',
+    isOverdue: false
+  }
+];
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-
-  const { data: meetings = [], isLoading: loadingMeetings } = useQuery({
-    queryKey: ['meetings'],
-    queryFn: api.getMeetings,
-  });
-
-  const { data: tasks = [], isLoading: loadingTasks } = useQuery({
-    queryKey: ['tasks'],
-    queryFn: api.getTasks,
-  });
-
-  const upcomingMeetings = meetings.filter(m => m.status === 'scheduled');
-  const pastMeetings = meetings.filter(m => m.status === 'completed');
-  const openTasksCount = tasks.filter(t => t.status !== 'done').length;
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
 
   const handleJoinMeeting = (id: string) => {
     navigate(`/meeting/${id}`);
@@ -38,167 +131,252 @@ export default function Dashboard() {
     navigate(`/summary/${id}`);
   };
 
-  const isLoading = loadingMeetings || loadingTasks;
+  const toggleItem = (id: string) => {
+    setCheckedItems(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   return (
-    <div className="p-8 max-w-[1200px] mx-auto w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-[24px] font-bold text-[#111827] tracking-tight">
-            Good morning, {user?.name?.split(' ')[0] || 'User'}
-          </h1>
-          <p className="text-[#6B7280] text-[14px] mt-1">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
-          </p>
+    <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter']">
+      <div className="max-w-[1200px] mx-auto w-full px-[32px] pb-[32px]">
+        
+        {/* Section 1 — Page Header */}
+        <div className="flex items-center justify-between pt-[32px]">
+          <div>
+            <h1 className="text-[24px] font-[700] text-[#111827] leading-tight">
+              Good morning, {user?.name?.split(' ')[0] || 'Shashank'}
+            </h1>
+            <p className="text-[#6B7280] text-[14px] mt-1 font-[400]">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button className="h-[36px] px-4 bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center">
+              Join with Code
+            </button>
+            <button className="h-[36px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center gap-2">
+              <Plus size={16} />
+              New Meeting
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-md text-[14px] font-medium transition-colors shadow-sm">
-            Join with Code
-          </button>
-          <button className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md text-[14px] font-medium transition-colors shadow-sm flex items-center gap-2">
-            <Plus size={16} />
-            New Meeting
-          </button>
-        </div>
-      </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64 text-[#6B7280]">
-          Loading dashboard data...
-        </div>
-      ) : (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[#6B7280] text-[13px] font-medium">Meetings This Week</h3>
-                <Calendar size={16} className="text-[#9CA3AF]" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-bold text-[#111827]">{upcomingMeetings.length + pastMeetings.length}</span>
-                <span className="text-[#10B981] text-[12px] font-medium bg-[#D1FAE5] px-2 py-0.5 rounded-full flex items-center gap-1">
-                  +2 from last week
-                </span>
-              </div>
-            </div>
-            
-            <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[#6B7280] text-[13px] font-medium">Open Action Items</h3>
-                <div className="w-4 h-4 rounded-full bg-[#F59E0B] flex items-center justify-center text-white text-[10px] font-bold">!</div>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-bold text-[#111827]">{openTasksCount}</span>
-                <button onClick={() => navigate('/tasks')} className="text-[#4F46E5] text-[12px] font-medium hover:underline ml-auto">
-                  View board →
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[#6B7280] text-[13px] font-medium">Hours Saved (Est.)</h3>
-                <Clock size={16} className="text-[#9CA3AF]" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-bold text-[#111827]">4.2h</span>
-                <span className="text-[#6B7280] text-[12px]">via AI summaries</span>
-              </div>
+        {/* Section 2 — KPI Stats Row */}
+        <div className="flex gap-[24px] mt-[24px]">
+          {/* Card 1 */}
+          <div className="flex-1 bg-[#FFFFFF] p-[20px] rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+            <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Meetings This Week</h3>
+            <div className="flex items-baseline gap-3">
+              <span className="text-[28px] font-[700] text-[#111827] leading-none">12</span>
+              <span className="bg-[#D1FAE5] text-[#065F46] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]">
+                +2 from last week
+              </span>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Upcoming Meetings */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[16px] font-semibold text-[#111827]">Upcoming Meetings</h2>
-                <button className="text-[#4F46E5] text-[13px] font-medium hover:underline">View Calendar</button>
-              </div>
-              <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-                {upcomingMeetings.length === 0 ? (
-                  <div className="p-8 text-center text-[#6B7280] text-[14px]">No upcoming meetings.</div>
-                ) : (
-                  <div className="divide-y divide-[#F3F4F6]">
-                    {upcomingMeetings.map((meeting) => (
-                      <div key={meeting.id} className="p-5 hover:bg-[#F9FAFB] transition-colors flex items-start justify-between group">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <h4 className="text-[15px] font-semibold text-[#111827] truncate mb-1">{meeting.title}</h4>
-                          <div className="flex items-center gap-3 text-[13px] text-[#6B7280]">
-                            <span className="flex items-center gap-1.5"><Calendar size={14} /> {meeting.date}</span>
-                            <span className="flex items-center gap-1.5"><Clock size={14} /> {meeting.duration}</span>
-                          </div>
-                          <div className="flex -space-x-2 mt-3">
-                            {meeting.attendees.map((attendee, i) => (
-                              <div 
-                                key={i} 
-                                className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
-                                style={{ background: attendee.color }}
-                                title={attendee.name}
-                              >
-                                {attendee.initials}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => handleJoinMeeting(meeting.id)}
-                            className="opacity-0 group-hover:opacity-100 px-3 py-1.5 bg-[#EEF2FF] text-[#4F46E5] rounded hover:bg-[#E0E7FF] text-[13px] font-medium transition-all"
-                          >
-                            Join Room
-                          </button>
-                          <button className="p-1.5 text-[#9CA3AF] hover:text-[#374151] rounded hover:bg-[#F3F4F6] transition-colors">
-                            <MoreVertical size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Card 2 */}
+          <div className="flex-1 bg-[#FFFFFF] p-[20px] rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)] relative">
+            <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Open Action Items</h3>
+            <div className="flex items-baseline gap-3">
+              <span className="text-[28px] font-[700] text-[#111827] leading-none">7</span>
+              <span className="bg-[#FEF3C7] text-[#92400E] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]">
+                3 due today
+              </span>
             </div>
+            <button onClick={() => navigate('/tasks')} className="absolute top-[20px] right-[20px] text-[#4F46E5] text-[13px] font-[400] hover:underline">
+              View board &rarr;
+            </button>
+          </div>
+        </div>
 
-            {/* Recent AI Summaries */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[16px] font-semibold text-[#111827]">Recent AI Summaries</h2>
-                <button className="text-[#4F46E5] text-[13px] font-medium hover:underline">View All</button>
-              </div>
-              <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-[0_2px_4px_rgba(0,0,0,0.02)] flex flex-col gap-px bg-[#F3F4F6]">
-                {pastMeetings.length === 0 ? (
-                  <div className="p-8 bg-white text-center text-[#6B7280] text-[14px]">No recent summaries.</div>
-                ) : (
-                  pastMeetings.map((meeting) => (
-                    <div key={meeting.id} className="p-5 bg-white hover:bg-[#F9FAFB] transition-colors cursor-pointer" onClick={() => handleViewSummary(meeting.id)}>
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-[#EEF2FF] flex items-center justify-center flex-shrink-0">
-                          <FileText size={20} className="text-[#4F46E5]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start mb-1">
-                            <h4 className="text-[15px] font-semibold text-[#111827] truncate">{meeting.title}</h4>
-                            <span className="text-[12px] text-[#6B7280] flex-shrink-0 bg-[#F3F4F6] px-2 py-0.5 rounded">{meeting.date.split(',')[0]}</span>
-                          </div>
-                          <p className="text-[13px] text-[#6B7280] line-clamp-2 leading-relaxed mb-3">
-                            {meeting.summary || "Summary generation in progress..."}
-                          </p>
-                          <div className="flex items-center gap-4 text-[12px] text-[#4F46E5] font-medium">
-                            <span className="flex items-center gap-1">
-                              {meeting.actionItems.length} Action Items <ArrowRight size={12} />
-                            </span>
-                          </div>
-                        </div>
+        {/* Section 3 — Core Action Launcher (Compact Zoom-style) */}
+        <div className="flex justify-evenly mt-[44px] w-full">
+          {/* Action 1 */}
+          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+              <Video size={24} className="text-[#4F46E5]" />
+            </button>
+            <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">New Meeting</span>
+          </div>
+          {/* Action 2 */}
+          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+              <LogIn size={24} className="text-[#4F46E5]" />
+            </button>
+            <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">Join</span>
+          </div>
+          {/* Action 3 */}
+          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+              <Calendar size={24} className="text-[#4F46E5]" />
+            </button>
+            <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">Schedule</span>
+          </div>
+          {/* Action 4 */}
+          <div className="flex flex-col items-center gap-2 cursor-pointer group text-center">
+            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+              <MonitorUp size={24} className="text-[#4F46E5]" />
+            </button>
+            <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors leading-tight">Share Screen</span>
+          </div>
+        </div>
+
+        {/* Section 4 — Two Column Content Area */}
+        <div className="flex items-stretch gap-[24px] mt-[44px]">
+          {/* Left Column — Upcoming Meetings */}
+          <div className="w-[58%] flex flex-col">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <h2 className="text-[16px] font-[600] text-[#111827]">Upcoming Meetings</h2>
+              <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View Calendar &rarr;</button>
+            </div>
+            <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col flex-1">
+              <div className="flex flex-col">
+                {upcomingMeetingsMock.map((meeting, index) => (
+                  <div 
+                    key={meeting.id} 
+                    className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== upcomingMeetingsMock.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                  >
+                    {/* Left Border indicator */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${meeting.isToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
+                    
+                    <div className="flex-1 pl-2">
+                      <h4 className="text-[15px] font-[600] text-[#111827] mb-1">{meeting.title}</h4>
+                      <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-1.5">
+                        <Calendar size={13} />
+                        <span>{meeting.time} • {meeting.duration}</span>
                       </div>
                     </div>
-                  ))
-                )}
+                    
+                    <div className="flex items-center gap-4">
+                      {/* Avatars */}
+                      <div className="flex -space-x-[8px]">
+                        {meeting.attendees.map((attendee, i) => (
+                          <div 
+                            key={i} 
+                            className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
+                            style={{ background: attendee.color }}
+                            title={attendee.name}
+                          >
+                            {attendee.initials}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleJoinMeeting(meeting.id)}
+                        className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
+                      >
+                        Join
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-[#F3F4F6] p-3 text-center mt-auto shrink-0">
+                <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">See all meetings &rarr;</button>
               </div>
             </div>
           </div>
-        </>
-      )}
+
+          {/* Right Column — Recent AI Summaries */}
+          <div className="w-[42%] flex flex-col">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <h2 className="text-[16px] font-[600] text-[#111827]">Recent AI Summaries</h2>
+              <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View All &rarr;</button>
+            </div>
+            <div className="flex flex-col gap-[12px] flex-1">
+              {recentSummariesMock.map((summary) => (
+                <div 
+                  key={summary.id} 
+                  className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] p-[16px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] hover:border-[#D1D5DB] transition-colors cursor-pointer flex-1 flex flex-col justify-center"
+                  onClick={() => handleViewSummary(summary.id)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-[28px] h-[28px] rounded-[6px] bg-[#EEF2FF] flex items-center justify-center flex-shrink-0 relative">
+                        <FileText size={14} className="text-[#4F46E5]" />
+                        <Sparkles size={8} className="text-[#4F46E5] absolute top-[4px] right-[4px]" />
+                      </div>
+                      <h4 className="text-[15px] font-[600] text-[#111827] truncate">{summary.title}</h4>
+                    </div>
+                    <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
+                      {summary.date}
+                    </span>
+                  </div>
+                  
+                  <p className="text-[13px] text-[#6B7280] font-[400] line-clamp-2 leading-[1.5] mb-3">
+                    {summary.summary}
+                  </p>
+                  
+                  {summary.actionItemsCount > 0 ? (
+                    <div className="flex items-center gap-1 text-[12px] font-[400] text-[#4F46E5]">
+                      {summary.actionItemsCount} action item{summary.actionItemsCount !== 1 ? 's' : ''}
+                      <ArrowRight size={12} />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[12px] font-[400] text-[#6B7280]">
+                      No action items
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5 — My Action Items */}
+        <div className="mt-[44px]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[16px] font-[600] text-[#111827]">My Action Items</h2>
+            <button onClick={() => navigate('/tasks')} className="text-[#4F46E5] text-[13px] font-[400] hover:underline">Go to Task Board &rarr;</button>
+          </div>
+          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden">
+            <div className="flex flex-col">
+              {actionItemsMock.map((item, index) => (
+                <div 
+                  key={item.id} 
+                  className={`p-[16px] flex items-center justify-between hover:bg-[#F9FAFB] transition-colors group ${index !== actionItemsMock.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                >
+                  <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                    <input 
+                      type="checkbox" 
+                      checked={!!checkedItems[item.id]}
+                      onChange={() => toggleItem(item.id)}
+                      className="w-[16px] h-[16px] border border-[#D1D5DB] rounded-[4px] text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer appearance-none checked:bg-[#4F46E5] checked:border-transparent flex-shrink-0 relative checked:after:content-['✓'] checked:after:absolute checked:after:text-white checked:after:text-[10px] checked:after:left-[3px] checked:after:top-[0px]"
+                    />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`text-[14px] font-[400] truncate transition-all ${checkedItems[item.id] ? 'line-through text-[#9CA3AF]' : 'text-[#111827]'}`}>
+                        {item.title}
+                      </span>
+                      <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
+                        From: {item.meeting}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                    {item.isOverdue && !checkedItems[item.id] && (
+                      <span className="bg-[#FEF2F2] text-[#DC2626] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]">
+                        Overdue
+                      </span>
+                    )}
+                    <span className="text-[12px] font-[400] text-[#9CA3AF]">{item.dueDate}</span>
+                    <div 
+                      className={`w-[24px] h-[24px] rounded-full border border-[#FFFFFF] flex items-center justify-center text-white text-[9px] font-bold shadow-sm transition-opacity ${checkedItems[item.id] ? 'opacity-50' : 'opacity-100'}`}
+                      style={{ background: item.assignee.color }}
+                      title={item.assignee.name}
+                    >
+                      {item.assignee.initials}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+      </div>
     </div>
   );
 }

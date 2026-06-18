@@ -36,7 +36,7 @@ export interface Meeting {
   summary?: string;
   actionItems: ActionItem[];
   attendees: Attendee[];
-  transcript?: { speaker: string; text: string; time?: string }[];
+  transcript?: { speaker: string; initials: string; color: string; text: string; time?: string }[];
   chat?: { sender: string; initials: string; color: string; text: string; time: string }[];
 }
 
@@ -102,6 +102,16 @@ const MOCK_MEETINGS: Meeting[] = [
       { initials: 'MK', name: 'Marcus Kim', color: '#10B981' },
       { initials: 'JL', name: 'Julia Liu', color: '#F59E0B' }
     ],
+    transcript: [
+      { speaker: "Sarah Anderson", initials: "SA", color: "#4F46E5", time: "10:02 AM", text: "Alright everyone, thanks for joining. Let's kick off the Q3 roadmap review." },
+      { speaker: "Marcus Kim", initials: "MK", color: "#10B981", time: "10:03 AM", text: "Hey Sarah. Quick question before we start - did we get the final numbers from the marketing campaign?" },
+      { speaker: "Sarah Anderson", initials: "SA", color: "#4F46E5", time: "10:03 AM", text: "Yes, they're in the shared doc. We can cover that in the second half. For now, let's focus on the mobile app launch." },
+      { speaker: "Julia Liu", initials: "JL", color: "#F59E0B", time: "10:04 AM", text: "I've pushed the latest designs to Figma. We're about 90% there with the core flows." }
+    ],
+    chat: [
+      { sender: "Marcus Kim", initials: "MK", color: "#10B981", time: "10:01 AM", text: "I might have to drop 5 mins early for another call." },
+      { sender: "Julia Liu", initials: "JL", color: "#F59E0B", time: "10:04 AM", text: "Link to designs: figma.com/file/xyz" }
+    ]
   },
   {
     id: 'm2',
@@ -117,6 +127,8 @@ const MOCK_MEETINGS: Meeting[] = [
       { initials: 'JL', name: 'Julia Liu', color: '#F59E0B' },
       { initials: 'RD', name: 'Ryan Davis', color: '#EF4444' }
     ],
+    transcript: [],
+    chat: []
   }
 ];
 

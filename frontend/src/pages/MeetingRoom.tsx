@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/store';
+import { api } from '../lib/api';
 import { 
   Mic, 
   MicOff, 
@@ -14,18 +16,6 @@ import {
   MoreVertical
 } from 'lucide-react';
 
-const MOCK_TRANSCRIPT = [
-  { speaker: "Sarah Anderson", initials: "SA", color: "#4F46E5", time: "10:02 AM", text: "Alright everyone, thanks for joining. Let's kick off the Q3 roadmap review." },
-  { speaker: "Marcus Kim", initials: "MK", color: "#10B981", time: "10:03 AM", text: "Hey Sarah. Quick question before we start - did we get the final numbers from the marketing campaign?" },
-  { speaker: "Sarah Anderson", initials: "SA", color: "#4F46E5", time: "10:03 AM", text: "Yes, they're in the shared doc. We can cover that in the second half. For now, let's focus on the mobile app launch." },
-  { speaker: "Julia Liu", initials: "JL", color: "#F59E0B", time: "10:04 AM", text: "I've pushed the latest designs to Figma. We're about 90% there with the core flows." }
-];
-
-const MOCK_CHAT = [
-  { sender: "Marcus Kim", initials: "MK", color: "#10B981", time: "10:01 AM", text: "I might have to drop 5 mins early for another call." },
-  { sender: "Julia Liu", initials: "JL", color: "#F59E0B", time: "10:04 AM", text: "Link to designs: figma.com/file/xyz" }
-];
-
 export default function MeetingRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -35,18 +25,32 @@ export default function MeetingRoom() {
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
   const [activeTab, setActiveTab] = useState<'transcript' | 'chat'>('transcript');
-  
-  // In a real app, we'd fetch the specific meeting. For mock, we'll just use dummy attendees.
-  const attendees = [
-    { name: "Sarah Anderson", initials: "SA", color: "#4F46E5", isSpeaking: true },
-    { name: "Marcus Kim", initials: "MK", color: "#10B981", isSpeaking: false },
-    { name: "Julia Liu", initials: "JL", color: "#F59E0B", isSpeaking: false },
-  ];
+
+  const { data: meeting, isLoading } = useQuery({
+    queryKey: ['meeting', id],
+    queryFn: () => api.getMeeting(id || 'm1')
+  });
 
   const handleEndCall = () => {
     // Navigate to summary screen for this meeting
     navigate(`/summary/${id || 'm1'}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-[#0F172A] flex flex-col font-sans items-center justify-center">
+        <div className="text-[#94A3B8]">Loading meeting room...</div>
+      </div>
+    );
+  }
+
+  const transcript = meeting?.transcript || [];
+  const chat = meeting?.chat || [];
+  const attendees = meeting?.attendees || [
+    { name: "Sarah Anderson", initials: "SA", color: "#4F46E5" },
+    { name: "Marcus Kim", initials: "MK", color: "#10B981" },
+    { name: "Julia Liu", initials: "JL", color: "#F59E0B" },
+  ];
 
   return (
     <div className="h-screen bg-[#0F172A] flex flex-col font-sans overflow-hidden">
@@ -54,7 +58,7 @@ export default function MeetingRoom() {
       <div className="h-14 flex items-center justify-between px-4 text-white border-b border-[#1E293B]">
         <div className="flex items-center gap-3">
           <div className="bg-[#EF4444] w-2 h-2 rounded-full animate-pulse" />
-          <span className="font-medium text-[14px]">Q3 Planning & Roadmap Review</span>
+          <span className="font-medium text-[14px]">{meeting?.title || 'Meeting Room'}</span>
           <span className="text-[#94A3B8] bg-[#1E293B] px-2 py-0.5 rounded text-[12px]">48:12</span>
         </div>
       </div>
@@ -67,7 +71,6 @@ export default function MeetingRoom() {
           <div className="relative bg-[#1E293B] rounded-xl overflow-hidden border-2 border-[#4F46E5] col-span-2 row-span-1 lg:col-span-1 lg:row-span-2 shadow-lg">
              {videoOn ? (
                <div className="absolute inset-0 flex items-center justify-center bg-[#334155]">
-                 {/* Placeholder for actual video feed */}
                  <span className="text-[#94A3B8]">Camera Feed</span>
                </div>
              ) : (
@@ -84,8 +87,8 @@ export default function MeetingRoom() {
           </div>
 
           {/* Other Attendees */}
-          {attendees.slice(1).map((attendee, idx) => (
-            <div key={idx} className={`relative bg-[#1E293B] rounded-xl overflow-hidden shadow-lg ${attendee.isSpeaking ? 'border-2 border-[#4F46E5]' : 'border border-[#334155]'}`}>
+          {attendees.filter(a => a.initials !== user?.initials).map((attendee, idx) => (
+            <div key={idx} className={`relative bg-[#1E293B] rounded-xl overflow-hidden shadow-lg border border-[#334155]`}>
               <div className="absolute inset-0 flex items-center justify-center bg-[#0F172A]">
                 <div 
                   className="w-16 h-16 rounded-full flex items-center justify-center text-white text-[20px] font-bold shadow-xl"
@@ -121,11 +124,11 @@ export default function MeetingRoom() {
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            {activeTab === 'transcript' && MOCK_TRANSCRIPT.map((entry, idx) => (
+            {activeTab === 'transcript' && transcript.map((entry, idx) => (
               <div key={idx} className="flex gap-3">
                 <div 
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-1"
-                  style={{ background: entry.color }}
+                  style={{ background: entry.color || '#4F46E5' }}
                 >
                   {entry.initials}
                 </div>
@@ -141,11 +144,11 @@ export default function MeetingRoom() {
               </div>
             ))}
 
-            {activeTab === 'chat' && MOCK_CHAT.map((entry, idx) => (
+            {activeTab === 'chat' && chat.map((entry, idx) => (
               <div key={idx} className="flex gap-3">
                 <div 
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                  style={{ background: entry.color }}
+                  style={{ background: entry.color || '#10B981' }}
                 >
                   {entry.initials}
                 </div>

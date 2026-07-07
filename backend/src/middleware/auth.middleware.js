@@ -1,5 +1,6 @@
 import { requireAuth, clerkClient } from "@clerk/express";
 import User from "../models/User.js";
+import { upsertStreamUser } from "../lib/stream.js";
 
 /**
  * protect: verifies the Clerk session token on the request.
@@ -42,6 +43,16 @@ export const attachUser = async (req, res, next) => {
         name: clerkUser.firstName || "User",
         profileImage: clerkUser.imageUrl || "",
       });
+
+      try {
+        await upsertStreamUser({
+          id: user.clerkId,
+          name: user.name,
+          image: user.profileImage,
+        });
+      } catch (streamErr) {
+        console.warn("Failed to sync new user to Stream in attachUser:", streamErr);
+      }
     }
 
     req.user = user;

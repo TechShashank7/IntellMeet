@@ -26,7 +26,9 @@ function mapSessionToMeeting(session: any): Meeting {
     })),
     startTime: session.startTime,
     endTime: session.endTime,
-    estimatedDuration: session.estimatedDuration
+    estimatedDuration: session.estimatedDuration,
+    callId: session.callId,
+    hostClerkId: session.host?.clerkId
   };
 }
 
@@ -100,10 +102,51 @@ export const api = {
     }
   },
 
+  getStreamToken: async (token: string): Promise<{ token: string; userId: string; userName: string; userImage: string }> => {
+    const res = await fetch(`${API_BASE_URL}/chat/token`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to get Stream token');
+    return await res.json();
+  },
+
+  joinMeeting: async (id: string, token: string): Promise<void> => {
+    try {
+      await fetch(`${API_BASE_URL}/meetings/${id}/join`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn('Failed to join meeting on backend', err);
+    }
+  },
+
+  endMeeting: async (id: string, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/meetings/${id}/end`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to end meeting on backend');
+  },
+
   // Meetings
   getMeetings: async (): Promise<Meeting[]> => {
     await delay(SIMULATED_DELAY);
     return useMeetingStore.getState().meetings;
+  },
+
+  createMeeting: async (token: string, topic: string): Promise<any> => {
+    const res = await fetch(`${API_BASE_URL}/meetings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ topic })
+    });
+    if (!res.ok) throw new Error('Failed to create meeting');
+    const data = await res.json();
+    return data.session;
   },
 
   getUpcomingMeetings: async (token: string): Promise<any[]> => {

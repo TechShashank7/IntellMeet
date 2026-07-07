@@ -99,6 +99,26 @@ export default function Dashboard() {
   });
 
 
+  const handleNewMeeting = async () => {
+    const topic = window.prompt('Meeting topic:', 'Quick Sync');
+    if (!topic || topic.trim() === '') return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const session = await api.createMeeting(token, topic);
+      navigate(`/meeting/${session._id}`);
+    } catch (error) {
+      console.error('Error creating meeting:', error);
+      window.alert('Failed to create meeting, please try again.');
+    }
+  };
+
+  const handleJoinWithCode = () => {
+    const id = window.prompt('Enter meeting ID:');
+    if (!id || id.trim() === '') return;
+    navigate(`/meeting/${id.trim()}`);
+  };
+
   const handleJoinMeeting = (id: string) => {
     navigate(`/meeting/${id}`);
   };
@@ -216,10 +236,10 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <button className="h-[36px] px-4 bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center">
+            <button onClick={handleJoinWithCode} className="h-[36px] px-4 bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center">
               Join with Code
             </button>
-            <button className="h-[36px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center gap-2">
+            <button onClick={handleNewMeeting} className="h-[36px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center gap-2">
               <Plus size={16} />
               New Meeting
             </button>
@@ -256,14 +276,14 @@ export default function Dashboard() {
         {/* Section 3 — Core Action Launcher (Compact Zoom-style) */}
         <div className="flex justify-evenly mt-[44px] w-full">
           {/* Action 1 */}
-          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+          <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={handleNewMeeting}>
             <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
               <Video size={24} className="text-[#4F46E5]" />
             </button>
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">New Meeting</span>
           </div>
           {/* Action 2 */}
-          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+          <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={handleJoinWithCode}>
             <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
               <LogIn size={24} className="text-[#4F46E5]" />
             </button>

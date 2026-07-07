@@ -1,9 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useUser, useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { getInitials, getAvatarColor } from '../lib/utils';
+import { 
+  StreamVideo, 
+  StreamCall, 
+  StreamVideoClient, 
+  SpeakerLayout, 
+  CallControls, 
+  StreamTheme, 
+  Call 
+} from '@stream-io/video-react-sdk';
+import '@stream-io/video-react-sdk/dist/css/styles.css';
+
 import { 
   Mic, 
   MicOff, 
@@ -27,14 +38,114 @@ export default function MeetingRoom() {
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
   const [activeTab, setActiveTab] = useState<'transcript' | 'chat'>('transcript');
+  
+  const [client, setClient] = useState<StreamVideoClient | null>(null);
+  const [call, setCall] = useState<Call | null>(null);
+
+  const clientRef = useRef<StreamVideoClient | null>(null);
+  const callRef = useRef<Call | null>(null);
 
   const { data: meeting, isLoading } = useQuery({
     queryKey: ['meeting', id],
-    queryFn: async () => api.getMeeting(id || 'm1', await getToken())
+    queryFn: async () => api.getMeeting(id || 'm1', await getToken() || null)
   });
 
-  const handleEndCall = () => {
-    // Navigate to summary screen for this meeting
+  const callId = meeting?.callId;
+  const meetingId = meeting?.id;
+  const hostClerkId = meeting?.hostClerkId;
+  const userId = user?.id;
+  const userFullName = user?.fullName;
+  const userImageUrl = user?.imageUrl;
+
+  useEffect(() => {
+    if (!callId || !userId) return;
+    
+    let isMounted = true;
+    let _client: StreamVideoClient | null = null;
+    let _call: Call | null = null;
+
+    const initCall = async () => {
+      try {
+        const token = await getToken();
+        if (!token || !isMounted) return;
+
+        const isHost = userId === hostClerkId;
+        
+        if (!isHost && meetingId) {
+          await api.joinMeeting(meetingId, token);
+          if (!isMounted) return;
+        }
+
+        const streamData = await api.getStreamToken(token);
+        if (!isMounted) return;
+        
+        _client = new StreamVideoClient({
+          apiKey: import.meta.env.VITE_STREAM_API_KEY,
+          user: {
+            id: userId,
+            name: userFullName || userId,
+            image: userImageUrl,
+          },
+          token: streamData.token,
+        });
+
+        _call = _client.call('default', callId);
+        
+        // Enable camera and microphone BEFORE joining and await them
+        await _call.camera.enable();
+        await _call.microphone.enable();
+        
+        await _call.join({ create: false });
+
+        if (isMounted) {
+          clientRef.current = _client;
+          callRef.current = _call;
+          setClient(_client);
+          setCall(_call);
+        } else {
+          _call.leave().catch(console.error);
+          _client.disconnectUser().catch(console.error);
+        }
+      } catch (error) {
+        console.error("Failed to initialize Stream call", error);
+      }
+    };
+
+    initCall();
+
+    return () => {
+      isMounted = false;
+      
+      // Cleanup using refs immediately to prevent double initialization issues in Strict Mode
+      if (callRef.current) {
+        callRef.current.leave().catch(console.error);
+        callRef.current = null;
+      }
+      if (clientRef.current) {
+        clientRef.current.disconnectUser().catch(console.error);
+        clientRef.current = null;
+      }
+      setClient(null);
+      setCall(null);
+    };
+  }, [callId, meetingId, hostClerkId, userId, userFullName, userImageUrl, getToken]);
+
+  const handleEndCall = async () => {
+    const isHost = user?.id === meeting?.hostClerkId;
+    
+    try {
+      if (isHost && meeting?.id) {
+        const token = await getToken();
+        if (token) {
+          await api.endMeeting(meeting.id, token);
+        }
+      } else {
+        await call?.leave();
+      }
+    } catch (err) {
+      console.error("Error during end call", err);
+    }
+    
     navigate(`/summary/${id || 'm1'}`);
   };
 
@@ -48,11 +159,6 @@ export default function MeetingRoom() {
 
   const transcript = meeting?.transcript || [];
   const chat = meeting?.chat || [];
-  const attendees = meeting?.attendees || [
-    { name: "Sarah Anderson", initials: "SA", color: "#4F46E5" },
-    { name: "Marcus Kim", initials: "MK", color: "#10B981" },
-    { name: "Julia Liu", initials: "JL", color: "#F59E0B" },
-  ];
 
   return (
     <div className="h-screen bg-[#0F172A] flex flex-col font-sans overflow-hidden">
@@ -68,49 +174,23 @@ export default function MeetingRoom() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Video Grid */}
-        <div className="flex-1 p-4 grid gap-4 grid-cols-2 grid-rows-2">
-          {/* Main Speaker / User */}
-          <div className="relative bg-[#1E293B] rounded-xl overflow-hidden border-2 border-[#4F46E5] col-span-2 row-span-1 lg:col-span-1 lg:row-span-2 shadow-lg">
-             {videoOn ? (
-               <div className="absolute inset-0 flex items-center justify-center bg-[#334155]">
-                 <span className="text-[#94A3B8]">Camera Feed</span>
-               </div>
-             ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-[#0F172A]">
-                  {user?.imageUrl ? (
-                    <img src={user.imageUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover shadow-xl" />
-                  ) : (
-                    <div 
-                      className="w-24 h-24 rounded-full flex items-center justify-center text-white text-[32px] font-bold shadow-xl"
-                      style={{ background: getAvatarColor(user?.id || 'me') }}
-                    >
-                      {getInitials(user?.fullName)}
-                    </div>
-                  )}
-                </div>
-             )}
-            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-md flex items-center gap-2 text-white text-[13px] font-medium">
-              You
-              {!micOn && <MicOff size={14} className="text-[#EF4444]" />}
+        <div className="flex-1 p-4 flex flex-col">
+          {client && call ? (
+            <StreamVideo client={client}>
+              <StreamCall call={call}>
+                <StreamTheme className="flex-1 rounded-xl overflow-hidden shadow-lg border-2 border-[#4F46E5] relative h-full">
+                  <SpeakerLayout />
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                    <CallControls />
+                  </div>
+                </StreamTheme>
+              </StreamCall>
+            </StreamVideo>
+          ) : (
+            <div className="flex-1 bg-[#1E293B] rounded-xl flex items-center justify-center border-2 border-[#4F46E5] shadow-lg">
+              <span className="text-[#94A3B8]">Loading meeting room...</span>
             </div>
-          </div>
-
-          {/* Other Attendees */}
-          {attendees.map((attendee, idx) => (
-            <div key={idx} className={`relative bg-[#1E293B] rounded-xl overflow-hidden shadow-lg border border-[#334155]`}>
-              <div className="absolute inset-0 flex items-center justify-center bg-[#0F172A]">
-                <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-white text-[20px] font-bold shadow-xl"
-                  style={{ background: attendee.color }}
-                >
-                  {attendee.initials}
-                </div>
-              </div>
-              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-2 text-white text-[12px] font-medium">
-                {attendee.name}
-              </div>
-            </div>
-          ))}
+          )}
         </div>
 
         {/* Sidebar */}

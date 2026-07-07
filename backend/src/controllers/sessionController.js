@@ -179,12 +179,16 @@ export async function joinSession(req, res) {
         },
       });
 
-      const channel = chatClient.channel("messaging", session.callId, {
-        name: `${session.topic} Session`,
-        created_by_id: clerkId,
-        members: Array.from(new Set([clerkId, ...(session.participants || [])])),
-      });
-      await channel.create();
+      try {
+        const channel = chatClient.channel("messaging", session.callId, {
+          name: `${session.topic} Session`,
+          created_by_id: clerkId,
+          members: Array.from(new Set([clerkId, ...(session.participants || [])])),
+        });
+        await channel.create();
+      } catch (channelErr) {
+        console.warn(`Failed to create chat channel for scheduled session ${session.callId}:`, channelErr.message);
+      }
       session.status = "active";
     }
 

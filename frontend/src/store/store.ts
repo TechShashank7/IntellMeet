@@ -34,6 +34,8 @@ export interface Meeting {
   startTime?: string;
   endTime?: string;
   estimatedDuration?: number;
+  callId?: string;
+  hostClerkId?: string;
 }
 
 export interface Task {

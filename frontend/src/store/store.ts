@@ -55,7 +55,7 @@ const MOCK_MEETINGS: Meeting[] = [
   {
     id: 'm1',
     title: 'Product Roadmap Sync',
-    date: 'Today, 10:00 AM',
+    date: new Date().toISOString(),
     duration: '48 min',
     status: 'completed',
     summary: 'Decided to prioritize the mobile app launch for Q3. API rate limiting discussion tabled to next sprint.',
@@ -81,7 +81,7 @@ const MOCK_MEETINGS: Meeting[] = [
   {
     id: 'm2',
     title: 'Q3 Planning & Roadmap Review',
-    date: 'Tomorrow, 2:00 PM',
+    date: new Date(Date.now() + 86400000).toISOString(),
     duration: '60 min',
     status: 'scheduled',
     summary: '',

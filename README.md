@@ -65,14 +65,14 @@ Transcribe. Summarize. Act. — Automatically.
 
 ```mermaid
 flowchart LR
-    A[React Frontend] -- REST + JWT --> B[Express API]
-    B --> C[(MongoDB)]
-    B --> D[Stream Video/Chat]
+    A[React Frontend] -->|REST plus JWT| B[Express API]
+    B --> C[MongoDB]
+    B --> D[Stream Video and Chat]
     B --> E[Gemini AI]
-    D -- Webhook: transcription ready --> B
-    B -- AI Summary + Action Items --> C
-    F[Clerk] -- Auth --> A
-    F -- Session Verification --> B
+    D -->|Webhook transcription ready| B
+    B -->|AI Summary and Action Items| C
+    F[Clerk] -->|Auth| A
+    F -->|Session Verification| B
 ```
 
 **Flow:** A user starts or joins a meeting → Stream handles video/chat and live transcription → once a call ends, a webhook delivers the transcript to the backend → Gemini processes it into a summary + action items → results are stored in MongoDB and surfaced on the dashboard, where action items can be promoted to the shared task board.

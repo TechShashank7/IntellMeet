@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/store';
+import { useUser, useClerk, useAuth } from '@clerk/clerk-react';
+import { useTeamStore } from '../store/store';
+import { api } from '../lib/api';
+import { getInitials, getAvatarColor } from '../lib/utils';
 import { 
   LayoutDashboard, 
   Video, 
@@ -23,11 +27,39 @@ const navItems = [
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const { getToken } = useAuth();
+  const { teams, currentTeamId, setTeams, setCurrentTeamId } = useTeamStore();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const [teamsLoaded, setTeamsLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const token = await getToken();
+        if (token) {
+          const data = await api.getTeams(token);
+          setTeams(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch teams", error);
+      } finally {
+        setTeamsLoaded(true);
+      }
+    };
+    fetchTeams();
+  }, [getToken, setTeams]);
+
+  useEffect(() => {
+    if (teamsLoaded && teams.length === 0) {
+      navigate('/onboarding');
+    }
+  }, [teamsLoaded, teams.length, navigate]);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -37,6 +69,22 @@ export default function DashboardLayout() {
         <div className="h-14 border-b border-[#E5E7EB] flex items-center px-5">
           <span className="text-[#4F46E5] text-[17px] font-bold tracking-[-0.02em]">IntellMeet</span>
         </div>
+        
+        {teams.length > 1 && (
+          <div className="px-3 py-3 border-b border-[#E5E7EB]">
+            <select
+              value={currentTeamId || ''}
+              onChange={(e) => setCurrentTeamId(e.target.value)}
+              className="w-full bg-white border border-[#E5E7EB] text-[#374151] text-[13px] rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+            >
+              {teams.map(team => (
+                <option key={team._id} value={team._id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
         <nav className="flex-1 p-3 space-y-0.5">
           {navItems.map((item) => {
@@ -61,15 +109,19 @@ export default function DashboardLayout() {
         {/* User Profile Footer */}
         <div className="border-t border-[#E5E7EB] p-4 flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <div 
-              className="rounded-full flex items-center justify-center text-white flex-shrink-0"
-              style={{ width: 32, height: 32, background: user?.color || '#4F46E5', fontSize: 11, fontWeight: 600 }}
-            >
-              {user?.initials || 'U'}
-            </div>
+            {user?.imageUrl ? (
+              <img src={user.imageUrl} alt="Profile" className="w-8 h-8 rounded-full flex-shrink-0 object-cover" />
+            ) : (
+              <div 
+                className="rounded-full flex items-center justify-center text-white flex-shrink-0"
+                style={{ width: 32, height: 32, background: getAvatarColor(user?.id || 'default'), fontSize: 11, fontWeight: 600 }}
+              >
+                {getInitials(user?.fullName)}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <div className="text-[#111827] text-[13px] font-medium truncate">{user?.name || 'User'}</div>
-              <div className="text-[#9CA3AF] text-[12px] truncate">{user?.email || 'user@example.com'}</div>
+              <div className="text-[#111827] text-[13px] font-medium truncate">{user?.fullName || 'User'}</div>
+              <div className="text-[#9CA3AF] text-[12px] truncate">{user?.primaryEmailAddress?.emailAddress || 'user@example.com'}</div>
             </div>
             <button className="text-[#9CA3AF] hover:text-[#6B7280]">
               <MoreHorizontal size={15} />

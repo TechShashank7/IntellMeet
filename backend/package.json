@@ -1,0 +1,29 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@clerk/express": "^1.7.41",
+    "@google/generative-ai": "^0.24.1",
+    "@stream-io/node-sdk": "^0.7.59",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-async-handler": "^1.2.0",
+    "inngest": "^3.48.1",
+    "mongoose": "^9.7.0",
+    "stream-chat": "^9.47.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

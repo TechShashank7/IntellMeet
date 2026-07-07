@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@clerk/clerk-react';
 import { 
   ArrowRight, 
   PlayCircle, 
@@ -29,6 +30,7 @@ const LOGOS = ["Stripe", "Linear", "Vercel", "Notion", "Figma", "Loom", "Slack",
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { isSignedIn } = useAuth();
 
   return (
     <div className="min-h-screen bg-white font-sans text-[#111827]">
@@ -46,18 +48,29 @@ export default function LandingPage() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 rounded-md text-[#374151] hover:bg-[#F3F4F6] transition-colors text-[14px] font-medium"
-            >
-              Log in
-            </button>
-            <button 
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors text-[14px] font-medium rounded-md"
-            >
-              Get Started
-            </button>
+            {isSignedIn ? (
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors text-[14px] font-medium rounded-md"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="px-4 py-2 rounded-md text-[#374151] hover:bg-[#F3F4F6] transition-colors text-[14px] font-medium"
+                >
+                  Log in
+                </button>
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors text-[14px] font-medium rounded-md"
+                >
+                  Get Started
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -84,10 +97,10 @@ export default function LandingPage() {
             
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <button 
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(isSignedIn ? '/dashboard' : '/login')}
                 className="flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-all rounded-md text-[15px] font-medium shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5"
               >
-                Start for free <ArrowRight size={16} />
+                {isSignedIn ? 'Go to Dashboard' : 'Start for free'} <ArrowRight size={16} />
               </button>
               <button className="flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-white text-[#374151] border border-[#E5E7EB] hover:bg-[#F9FAFB] transition-colors rounded-md text-[15px] font-medium">
                 <PlayCircle size={18} /> Watch demo
@@ -242,10 +255,10 @@ export default function LandingPage() {
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(isSignedIn ? '/dashboard' : '/login')}
               className="w-full sm:w-auto px-7 py-3.5 bg-white text-[#4F46E5] hover:bg-[#F5F3FF] transition-colors rounded-md text-[15px] font-semibold"
             >
-              Get started free →
+              {isSignedIn ? 'Go to Dashboard →' : 'Get started free →'}
             </button>
             <button className="w-full sm:w-auto px-7 py-3.5 border border-[#6366F1] text-white hover:bg-[#4338CA] transition-colors rounded-md text-[15px] font-medium">
               See a live demo

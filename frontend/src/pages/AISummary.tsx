@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
+import { useTeamStore } from '../store/store';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -20,11 +22,13 @@ export default function AISummary() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+  const { currentTeamId } = useTeamStore();
   const [syncedItems, setSyncedItems] = useState<Set<string>>(new Set());
 
   const { data: meeting, isLoading: loadingMeeting } = useQuery({
     queryKey: ['meeting', id],
-    queryFn: () => api.getMeeting(id || ''),
+    queryFn: async () => api.getMeeting(id || '', await getToken() || ''),
     enabled: !!id
   });
 
@@ -35,9 +39,10 @@ export default function AISummary() {
   });
 
   const { mutate: addTask } = useMutation({
-    mutationFn: api.addTask,
+    mutationFn: async (taskData: { title: string; assignee?: string; dueDate?: string }) => 
+      api.addTask(currentTeamId || '', await getToken() || '', taskData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
     }
   });
 
@@ -45,14 +50,9 @@ export default function AISummary() {
     if (syncedItems.has(item.id) || !meeting) return;
     
     addTask({
-      id: `task-${Date.now()}`,
       title: item.task,
-      status: 'backlog',
-      assignee: item.assignee,
-      priority: 'medium',
-      due: item.due,
-      sourceMeetingId: meeting.id,
-      sourceMeetingTitle: meeting.title
+      assignee: item.assignee?.name || undefined,
+      dueDate: item.due
     });
     
     setSyncedItems(prev => new Set(prev).add(item.id));

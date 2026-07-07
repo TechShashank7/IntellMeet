@@ -5,13 +5,6 @@ import { persist } from 'zustand/middleware';
 // DATA MODELS
 // ---------------------------
 
-export interface User {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-  email: string;
-}
 
 export interface Attendee {
   initials: string;
@@ -38,6 +31,9 @@ export interface Meeting {
   attendees: Attendee[];
   transcript?: { speaker: string; initials: string; color: string; text: string; time?: string }[];
   chat?: { sender: string; initials: string; color: string; text: string; time: string }[];
+  startTime?: string;
+  endTime?: string;
+  estimatedDuration?: number;
 }
 
 export interface Task {
@@ -51,37 +47,6 @@ export interface Task {
   sourceMeetingTitle?: string;
 }
 
-// ---------------------------
-// AUTH STORE
-// ---------------------------
-interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string) => void;
-  logout: () => void;
-}
-
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
-      login: (email) =>
-        set({
-          user: {
-            id: '1',
-            name: 'Sarah Anderson',
-            initials: 'SA',
-            color: '#4F46E5',
-            email,
-          },
-          isAuthenticated: true,
-        }),
-      logout: () => set({ user: null, isAuthenticated: false }),
-    }),
-    { name: 'intellmeet-auth' }
-  )
-);
 
 // ---------------------------
 // MEETINGS STORE
@@ -176,5 +141,38 @@ export const useTaskStore = create<TasksState>()(
       })),
     }),
     { name: 'intellmeet-tasks' }
+  )
+);
+
+// ---------------------------
+// TEAMS STORE
+// ---------------------------
+export interface Team {
+  _id: string;
+  name: string;
+}
+
+interface TeamState {
+  teams: Team[];
+  currentTeamId: string | null;
+  setTeams: (teams: Team[]) => void;
+  setCurrentTeamId: (id: string) => void;
+}
+
+export const useTeamStore = create<TeamState>()(
+  persist(
+    (set) => ({
+      teams: [],
+      currentTeamId: null,
+      setTeams: (teams) => set((state) => {
+        const hasCurrent = teams.some(t => t._id === state.currentTeamId);
+        const nextId = (state.currentTeamId === null || !hasCurrent) && teams.length > 0 
+          ? teams[0]._id 
+          : (teams.length === 0 ? null : state.currentTeamId);
+        return { teams, currentTeamId: nextId };
+      }),
+      setCurrentTeamId: (id) => set({ currentTeamId: id }),
+    }),
+    { name: 'intellmeet-teams' }
   )
 );

@@ -1,17 +1,20 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { SignIn, useAuth } from '@clerk/clerk-react';
 import LandingPage from './pages/LandingPage';
-import LoginSignup from './pages/LoginSignup';
 import Dashboard from './pages/Dashboard';
 import MeetingRoom from './pages/MeetingRoom';
 import AISummary from './pages/AISummary';
 import TaskBoard from './pages/TaskBoard';
 import DashboardLayout from './layouts/DashboardLayout';
-import { useAuthStore } from './store/store';
+import Onboarding from './pages/Onboarding';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  if (!isAuthenticated) {
+  const { isLoaded, isSignedIn } = useAuth();
+  
+  if (!isLoaded) return null;
+
+  if (!isSignedIn) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -22,7 +25,11 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginSignup />} />
+        <Route path="/login/*" element={
+          <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA]">
+            <SignIn routing="path" path="/login" fallbackRedirectUrl="/dashboard" signUpFallbackRedirectUrl="/dashboard" />
+          </div>
+        } />
         
         {/* Protected Routes with Sidebar Layout */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
@@ -32,6 +39,7 @@ function App() {
         </Route>
 
         {/* Protected Fullscreen Routes */}
+        <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
         <Route path="/meeting/:id" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
         <Route path="/summary/:id" element={<ProtectedRoute><AISummary /></ProtectedRoute>} />
         

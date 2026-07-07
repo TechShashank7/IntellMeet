@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/store';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth, useUser } from '@clerk/clerk-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../lib/api';
+import { formatMeetingDuration, getInitials, getAvatarColor } from '../lib/utils';
+import { useTeamStore } from '../store/store';
 import { 
   Plus, 
   Calendar, 
@@ -11,85 +15,9 @@ import {
   MonitorUp,
   Sparkles
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 
-const upcomingMeetingsMock = [
-  {
-    id: '1',
-    title: 'Q3 Roadmap Sync',
-    date: 'Today',
-    time: '10:00 AM',
-    duration: '45m',
-    isToday: true,
-    attendees: [
-      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' },
-      { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
-      { name: 'Julia Liu', initials: 'JL', color: '#10B981' }
-    ]
-  },
-  {
-    id: '2',
-    title: 'Client Discovery — Acme Corp',
-    date: 'Today',
-    time: '1:00 PM',
-    duration: '1h',
-    isToday: true,
-    attendees: [
-      { name: 'Ryan Davis', initials: 'RD', color: '#F59E0B' },
-      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' }
-    ]
-  },
-  {
-    id: '3',
-    title: 'Design Review: Mobile App',
-    date: 'Tomorrow',
-    time: '11:30 AM',
-    duration: '30m',
-    isToday: false,
-    attendees: [
-      { name: 'Julia Liu', initials: 'JL', color: '#10B981' },
-      { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
-      { name: 'Ryan Davis', initials: 'RD', color: '#F59E0B' },
-      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' }
-    ]
-  },
-  {
-    id: '4',
-    title: 'Product Sync: Q4 Goals',
-    date: 'Tomorrow',
-    time: '2:00 PM',
-    duration: '45m',
-    isToday: false,
-    attendees: [
-      { name: 'Sarah Anderson', initials: 'SA', color: '#EF4444' },
-      { name: 'Julia Liu', initials: 'JL', color: '#10B981' }
-    ]
-  }
-];
 
-const recentSummariesMock = [
-  {
-    id: '1',
-    title: 'Engineering Standup',
-    date: 'Today',
-    summary: 'Discussed API performance bottlenecks and assigned backend tasks for the upcoming sprint. Julia to investigate database indexes.',
-    actionItemsCount: 3
-  },
-  {
-    id: '2',
-    title: 'Marketing Weekly',
-    date: 'Yesterday',
-    summary: 'Reviewed Q2 campaign metrics. Content team is delayed on the new landing page copy. Marcus to follow up with the agency.',
-    actionItemsCount: 1
-  },
-  {
-    id: '3',
-    title: 'All Hands Q&A',
-    date: 'Yesterday',
-    summary: 'Leadership addressed questions about the remote work policy and announced the upcoming company retreat schedule.',
-    actionItemsCount: 0
-  }
-];
 
 const actionItemsMock = [
   {
@@ -120,8 +48,56 @@ const actionItemsMock = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  const { user } = useUser();
+  const { getToken } = useAuth();
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  
+  const queryClient = useQueryClient();
+  const { currentTeamId } = useTeamStore();
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMessage, setInviteMessage] = useState<{ success: boolean; text: string } | null>(null);
+
+  const { data: teamMembers = [], isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['teamMembers', currentTeamId],
+    queryFn: async () => api.getTeamMembers(currentTeamId || '', await getToken() || ''),
+    enabled: !!currentTeamId && tab === 'team'
+  });
+
+  const { mutate: inviteMember, isPending: isInviting } = useMutation({
+    mutationFn: async (email: string) => api.inviteTeamMember(currentTeamId || '', await getToken() || '', email),
+    onSuccess: (res) => {
+      setInviteMessage({ success: res.success, text: res.message });
+      if (res.success) {
+        queryClient.invalidateQueries({ queryKey: ['teamMembers', currentTeamId] });
+        setInviteEmail('');
+      }
+    }
+  });
+
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    inviteMember(inviteEmail.trim());
+  };
+
+  const { data: upcomingMeetings = [], isLoading: isLoadingUpcoming } = useQuery({
+    queryKey: ['upcomingMeetings'],
+    queryFn: async () => {
+      const token = await getToken();
+      return api.getUpcomingMeetings(token || '');
+    }
+  });
+
+  const { data: recentMeetings = [], isLoading: isLoadingRecent } = useQuery({
+    queryKey: ['recentMeetings'],
+    queryFn: async () => {
+      const token = await getToken();
+      return api.getRecentMeetings(token || '');
+    }
+  });
+
 
   const handleJoinMeeting = (id: string) => {
     navigate(`/meeting/${id}`);
@@ -138,6 +114,93 @@ export default function Dashboard() {
     }));
   };
 
+  if (tab === 'team') {
+    const currentUserMember = teamMembers.find((m: any) => m.clerkId === user?.id);
+    const isCurrentUserAdmin = currentUserMember?.isAdmin;
+
+    return (
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
+        <h2 className="text-[24px] font-[600] text-[#111827] mb-6">Team Members</h2>
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-6 shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+          {isLoadingMembers ? (
+            <p className="text-[#6B7280] text-[14px]">Loading members...</p>
+          ) : (
+            <div className="space-y-4">
+              {teamMembers.length === 0 && (
+                <div className="p-4 text-sm text-gray-500">
+                  <p>Debug Info:</p>
+                  <pre>
+                    currentTeamId: {currentTeamId}
+                    {'\n'}
+                    isLoading: {isLoadingMembers ? 'true' : 'false'}
+                  </pre>
+                </div>
+              )}
+              {teamMembers.map((member: any) => (
+                <div key={member.clerkId} className="flex items-center justify-between p-4 border border-[#E5E7EB] rounded-lg">
+                  <div className="flex items-center gap-4">
+                    {member.profileImage ? (
+                      <img src={member.profileImage} alt={member.name} className="w-10 h-10 rounded-full object-cover shadow-sm" />
+                    ) : (
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm"
+                        style={{ background: getAvatarColor(member.clerkId) }}
+                      >
+                        {getInitials(member.name)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-[14px] font-[600] text-[#111827] flex items-center gap-2">
+                        {member.name}
+                        {member.isAdmin && (
+                          <span className="bg-[#EEF2FF] text-[#4F46E5] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-[#EEF2FF]">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[13px] text-[#6B7280]">{member.email}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isCurrentUserAdmin && (
+            <div className="mt-8 pt-6 border-t border-[#E5E7EB]">
+              <h3 className="text-[15px] font-[600] text-[#111827] mb-4">Invite Team Member</h3>
+              <form onSubmit={handleInvite} className="flex flex-col gap-3 max-w-md">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Email address"
+                    className="flex-1 border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                    required
+                    disabled={isInviting}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isInviting || !inviteEmail.trim()}
+                    className="px-4 py-2 bg-[#4F46E5] text-white rounded-md text-[13px] font-medium hover:bg-[#4338CA] transition-colors disabled:opacity-70 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isInviting ? 'Inviting...' : 'Invite'}
+                  </button>
+                </div>
+                {inviteMessage && (
+                  <div className={`text-[13px] p-2 rounded-md ${inviteMessage.success ? 'bg-[#ECFDF5] text-[#059669]' : 'bg-[#FEF2F2] text-[#DC2626]'}`}>
+                    {inviteMessage.text}
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter']">
       <div className="max-w-[1200px] mx-auto w-full px-[32px] pb-[32px]">
@@ -146,7 +209,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between pt-[32px]">
           <div>
             <h1 className="text-[24px] font-[700] text-[#111827] leading-tight">
-              Good morning, {user?.name?.split(' ')[0] || 'Shashank'}
+              Good morning, {user?.firstName || 'Shashank'}
             </h1>
             <p className="text-[#6B7280] text-[14px] mt-1 font-[400]">
               {format(new Date(), 'EEEE, MMMM d, yyyy')}
@@ -232,26 +295,36 @@ export default function Dashboard() {
             </div>
             <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col flex-1">
               <div className="flex flex-col">
-                {upcomingMeetingsMock.map((meeting, index) => (
+                {isLoadingUpcoming ? (
+                  <div className="p-5 text-[#6B7280] text-[14px]">Loading upcoming meetings...</div>
+                ) : upcomingMeetings.length === 0 ? (
+                  <div className="p-5 text-[#6B7280] text-[14px]">No upcoming meetings</div>
+                ) : upcomingMeetings.map((meeting: any, index: number) => {
+                  const meetingDate = new Date(meeting.startTime || meeting.date);
+                  const isMeetingToday = isToday(meetingDate);
+                  const timeStr = format(meetingDate, 'h:mm a');
+                  const durationStr = formatMeetingDuration(meeting.startTime || meeting.date, meeting.endTime, meeting.estimatedDuration);
+                  
+                  return (
                   <div 
                     key={meeting.id} 
-                    className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== upcomingMeetingsMock.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                    className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== upcomingMeetings.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
                   >
                     {/* Left Border indicator */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${meeting.isToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
+                    <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${isMeetingToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
                     
                     <div className="flex-1 pl-2">
                       <h4 className="text-[15px] font-[600] text-[#111827] mb-1">{meeting.title}</h4>
                       <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-1.5">
                         <Calendar size={13} />
-                        <span>{meeting.time} • {meeting.duration}</span>
+                        <span>{timeStr} • {durationStr}</span>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
                       {/* Avatars */}
                       <div className="flex -space-x-[8px]">
-                        {meeting.attendees.map((attendee, i) => (
+                        {meeting.attendees?.map((attendee: any, i: number) => (
                           <div 
                             key={i} 
                             className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
@@ -271,7 +344,8 @@ export default function Dashboard() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="border-t border-[#F3F4F6] p-3 text-center mt-auto shrink-0">
                 <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">See all meetings &rarr;</button>
@@ -286,7 +360,20 @@ export default function Dashboard() {
               <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View All &rarr;</button>
             </div>
             <div className="flex flex-col gap-[12px] flex-1">
-              {recentSummariesMock.map((summary) => (
+              {isLoadingRecent ? (
+                <div className="text-[#6B7280] text-[14px]">Loading recent meetings...</div>
+              ) : recentMeetings.length === 0 ? (
+                <div className="text-[#6B7280] text-[14px]">No recent meetings</div>
+              ) : recentMeetings.map((summary: any) => {
+                const meetingDate = new Date(summary.startTime || summary.date);
+                let dateLabel = format(meetingDate, 'MMM d');
+                if (isToday(meetingDate)) dateLabel = 'Today';
+                else if (isYesterday(meetingDate)) dateLabel = 'Yesterday';
+                
+                const summaryText = summary.summary ? summary.summary : 'Summary pending';
+                const actionItemsCount = summary.actionItems?.length || 0;
+
+                return (
                 <div 
                   key={summary.id} 
                   className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] p-[16px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] hover:border-[#D1D5DB] transition-colors cursor-pointer flex-1 flex flex-col justify-center"
@@ -301,17 +388,17 @@ export default function Dashboard() {
                       <h4 className="text-[15px] font-[600] text-[#111827] truncate">{summary.title}</h4>
                     </div>
                     <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
-                      {summary.date}
+                      {dateLabel}
                     </span>
                   </div>
                   
                   <p className="text-[13px] text-[#6B7280] font-[400] line-clamp-2 leading-[1.5] mb-3">
-                    {summary.summary}
+                    {summaryText}
                   </p>
                   
-                  {summary.actionItemsCount > 0 ? (
+                  {actionItemsCount > 0 ? (
                     <div className="flex items-center gap-1 text-[12px] font-[400] text-[#4F46E5]">
-                      {summary.actionItemsCount} action item{summary.actionItemsCount !== 1 ? 's' : ''}
+                      {actionItemsCount} action item{actionItemsCount !== 1 ? 's' : ''}
                       <ArrowRight size={12} />
                     </div>
                   ) : (
@@ -320,7 +407,8 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

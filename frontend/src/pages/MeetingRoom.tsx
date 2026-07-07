@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../store/store';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
+import { getInitials, getAvatarColor } from '../lib/utils';
 import { 
   Mic, 
   MicOff, 
@@ -19,7 +20,8 @@ import {
 export default function MeetingRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user } = useUser();
+  const { getToken } = useAuth();
   
   // Controls state
   const [micOn, setMicOn] = useState(true);
@@ -28,7 +30,7 @@ export default function MeetingRoom() {
 
   const { data: meeting, isLoading } = useQuery({
     queryKey: ['meeting', id],
-    queryFn: () => api.getMeeting(id || 'm1')
+    queryFn: async () => api.getMeeting(id || 'm1', await getToken())
   });
 
   const handleEndCall = () => {
@@ -75,9 +77,16 @@ export default function MeetingRoom() {
                </div>
              ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-[#0F172A]">
-                  <div className="w-24 h-24 rounded-full bg-[#4F46E5] flex items-center justify-center text-white text-[32px] font-bold shadow-xl">
-                    {user?.initials || 'SA'}
-                  </div>
+                  {user?.imageUrl ? (
+                    <img src={user.imageUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover shadow-xl" />
+                  ) : (
+                    <div 
+                      className="w-24 h-24 rounded-full flex items-center justify-center text-white text-[32px] font-bold shadow-xl"
+                      style={{ background: getAvatarColor(user?.id || 'me') }}
+                    >
+                      {getInitials(user?.fullName)}
+                    </div>
+                  )}
                 </div>
              )}
             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-md flex items-center gap-2 text-white text-[13px] font-medium">
@@ -87,7 +96,7 @@ export default function MeetingRoom() {
           </div>
 
           {/* Other Attendees */}
-          {attendees.filter(a => a.initials !== user?.initials).map((attendee, idx) => (
+          {attendees.map((attendee, idx) => (
             <div key={idx} className={`relative bg-[#1E293B] rounded-xl overflow-hidden shadow-lg border border-[#334155]`}>
               <div className="absolute inset-0 flex items-center justify-center bg-[#0F172A]">
                 <div 

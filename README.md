@@ -178,6 +178,8 @@ Development follows a **phased, browser-verified approach** — each phase is co
 |---|---|
 | **Shashank Raj** | Frontend & Product Architecture |
 | **Tanuj Gupta** | Backend Development |
+| **Dara Saiteja** | Frontend Development |
+| **Gaurav Kumar** | Backend Development |
 
 ---
 

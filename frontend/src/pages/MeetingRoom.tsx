@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useUser, useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
-import { getInitials, getAvatarColor } from '../lib/utils';
 import { 
   StreamVideo, 
   StreamCall, 

@@ -87,6 +87,11 @@ export default function MeetingRoom() {
             image: userImageUrl,
           },
           token: streamData.token,
+          options: {
+            axiosRequestConfig: {
+              timeout: 15000, // Increase API timeout to 15 seconds to prevent Axios timeouts on slow networks
+            }
+          }
         });
 
         _call = _client.call('default', callId);

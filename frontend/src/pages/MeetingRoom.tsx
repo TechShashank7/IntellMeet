@@ -10,7 +10,8 @@ import {
   SpeakerLayout, 
   CallControls, 
   StreamTheme, 
-  Call 
+  Call,
+  CallingState
 } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 
@@ -102,8 +103,10 @@ export default function MeetingRoom() {
           setClient(_client);
           setCall(_call);
         } else {
-          _call.leave().catch(console.error);
-          _client.disconnectUser().catch(console.error);
+          if (_call.state.callingState !== CallingState.LEFT) {
+            _call.leave().catch(() => {});
+          }
+          _client.disconnectUser().catch(() => {});
         }
       } catch (error) {
         console.error("Failed to initialize Stream call", error);
@@ -117,11 +120,28 @@ export default function MeetingRoom() {
       
       // Cleanup using refs immediately to prevent double initialization issues in Strict Mode
       if (callRef.current) {
-        callRef.current.leave().catch(console.error);
+        const callingState = callRef.current.state.callingState;
+        if (callingState !== CallingState.LEFT) {
+          try {
+            callRef.current.leave().catch((err: any) => {
+              if (!err.message?.includes('already been left')) {
+                console.error("Failed to leave call:", err);
+              }
+            });
+          } catch (err: any) {
+            if (!err.message?.includes('already been left')) {
+              console.error("Failed to leave call synchronously:", err);
+            }
+          }
+        }
         callRef.current = null;
       }
       if (clientRef.current) {
-        clientRef.current.disconnectUser().catch(console.error);
+        try {
+          clientRef.current.disconnectUser().catch(console.error);
+        } catch (err) {
+          console.error("Failed to disconnect user synchronously:", err);
+        }
         clientRef.current = null;
       }
       setClient(null);
@@ -139,10 +159,14 @@ export default function MeetingRoom() {
           await api.endMeeting(meeting.id, token);
         }
       } else {
-        await call?.leave();
+        if (call && call.state.callingState !== CallingState.LEFT) {
+          await call.leave();
+        }
       }
-    } catch (err) {
-      console.error("Error during end call", err);
+    } catch (err: any) {
+      if (!err.message?.includes('already been left')) {
+        console.error("Error during end call", err);
+      }
     }
     
     navigate(`/summary/${id || 'm1'}`);

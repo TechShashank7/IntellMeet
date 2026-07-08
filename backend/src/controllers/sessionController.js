@@ -163,6 +163,8 @@ export async function joinSession(req, res) {
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
+    console.log(`Entering joinSession: status=${session.status}, clerkId=${clerkId}`);
+
     if (session.status === "completed") {
       return res.status(400).json({ message: "Cannot join a completed session" });
     }
@@ -198,11 +200,15 @@ export async function joinSession(req, res) {
 
     if (session.status === "active") {
       const channel = chatClient.channel("messaging", session.callId);
+      console.log(`Attempting to add ${clerkId} to chat channel for ${session.callId}`);
       await channel.addMembers([clerkId]);
+      console.log("Chat channel member added successfully");
       
       const call = streamClient.video.call("default", session.callId);
       try {
-        await call.startTranscription({ language: "en" });
+        console.log(`Calling startTranscription for ${session.callId}`);
+        const result = await call.startTranscription({ language: "en" });
+        console.log("startTranscription result:", JSON.stringify(result));
       } catch (err) {
         console.error(`Failed to start transcription for ${session.callId}: ${err.message}`);
       }
@@ -237,7 +243,9 @@ export async function endSession(req, res) {
       const call = streamClient.video.call("default", session.callId);
 
       try {
-        await call.stopTranscription();
+        console.log(`Calling stopTranscription for ${session.callId}`);
+        const result = await call.stopTranscription();
+        console.log("stopTranscription result:", JSON.stringify(result));
       } catch (err) {
         console.error(`Failed to stop transcription for ${session.callId}: ${err.message}`);
       }

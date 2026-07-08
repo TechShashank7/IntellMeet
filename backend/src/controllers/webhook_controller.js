@@ -3,10 +3,12 @@ import Session from "../models/Session.js";
 import { summarizeAndPersist } from "../services/ai.service.js";
 
 export const handleStreamVideoWebhook = async (req, res) => {
+  console.log("Webhook received, event type header/body preview:", req.headers["x-signature"] ? "has signature" : "no signature");
   const signature = req.headers["x-signature"];
 
   // Verify the signature
   const isValid = streamClient.verifyWebhook(req.body, signature);
+  console.log("Signature valid:", isValid);
   
   if (!isValid) {
     console.warn("Invalid webhook signature from Stream");
@@ -17,6 +19,7 @@ export const handleStreamVideoWebhook = async (req, res) => {
   let event;
   try {
     event = JSON.parse(req.body.toString("utf8"));
+    console.log("Parsed event type:", event.type);
   } catch (error) {
     console.warn("Failed to parse webhook body as JSON", error);
     return res.status(400).json({ error: "Invalid JSON body" });

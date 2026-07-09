@@ -94,7 +94,7 @@ export default function Dashboard() {
       if (!token) return;
       const session = await api.createMeeting(token, meetingTopic);
       setIsNewMeetingModalOpen(false);
-      navigate(`/meeting/${session._id}`);
+      navigate(`/meeting/${session.joinCode || session._id}`);
     } catch (error) {
       console.error('Error creating meeting:', error);
       window.alert('Failed to create meeting, please try again.');

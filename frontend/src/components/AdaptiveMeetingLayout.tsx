@@ -1,4 +1,4 @@
-import { useCallStateHooks, ParticipantView } from '@stream-io/video-react-sdk';
+import { useCallStateHooks, ParticipantView, type StreamVideoParticipant } from '@stream-io/video-react-sdk';
 
 interface AdaptiveMeetingLayoutProps {
   isSidebarOpen?: boolean;
@@ -16,9 +16,9 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
 
   // Screen Share Layout Override
   const sharingParticipants = participants.filter((p) => 
-    p.publishedTracks.includes('SCREEN_SHARE') || 
-    p.publishedTracks.includes(3) ||
-    p.publishedTracks.includes('screenShareTrack') ||
+    (p.publishedTracks as any[]).includes('SCREEN_SHARE') || 
+    (p.publishedTracks as any[]).includes(3) ||
+    (p.publishedTracks as any[]).includes('screenShareTrack') ||
     (p as any).hasScreenShare
   );
   
@@ -37,7 +37,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
     }
 
     // 2+ Participants
-    const orderedParticipants = [...remoteParticipants, localParticipant].filter(Boolean);
+    const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
 
     let stripContent;
 
@@ -49,7 +49,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
       
       if (orderedParticipants.length > MAX_VISIBLE) {
         const visibleRemotes = remoteParticipants.slice(0, 3);
-        visibleParticipants = [...visibleRemotes, localParticipant].filter(Boolean);
+        visibleParticipants = [...visibleRemotes, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
         hiddenCount = remoteParticipants.length - 3;
       }
 
@@ -151,7 +151,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
   // 3 or 4 Participants (Flex row)
   if (participants.length === 3 || participants.length === 4) {
     // Ensure local participant is always rendered last (rightmost)
-    const orderedParticipants = [...remoteParticipants, localParticipant].filter(Boolean);
+    const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
     return (
       <div className="flex w-full h-full gap-2">
         {orderedParticipants.map((p) => (
@@ -164,7 +164,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
   }
 
   // 5 or more Participants (CSS Grid)
-  const orderedParticipants = [...remoteParticipants, localParticipant].filter(Boolean);
+  const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr gap-2 w-full h-full">
       {orderedParticipants.map((p) => (

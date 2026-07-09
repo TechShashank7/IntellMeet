@@ -67,7 +67,7 @@ export default function MeetingRoom() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showParticipantPanel, setShowParticipantPanel] = useState(false);
   
-  const [chatClient, setChatClient] = useState<StreamChat | null>(null);
+  const [, setChatClient] = useState<StreamChat | null>(null);
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -84,6 +84,8 @@ export default function MeetingRoom() {
   const callRef = useRef<Call | null>(null);
   const chatClientRef = useRef<StreamChat | null>(null);
   const channelRef = useRef<StreamChannel | null>(null);
+  const closedCaptionHandlerRef = useRef<any>(null);
+  const messageHandlerRef = useRef<any>(null);
 
   const { data: meeting, isLoading } = useQuery({
     queryKey: ['meeting', id],
@@ -171,7 +173,7 @@ export default function MeetingRoom() {
             }
           }
 
-          _call.on('call.closed_caption', (event) => {
+          const closedCaptionHandler = (event: any) => {
             console.log('RAW CAPTION EVENT:', JSON.stringify(event));
             const text = event.closed_caption?.text ?? event.text;
             const speakerId = event.closed_caption?.speaker_id ?? event.user?.id ?? event.speaker_id;
@@ -184,7 +186,9 @@ export default function MeetingRoom() {
                 time: new Date().toISOString()
               }]);
             }
-          });
+          };
+          closedCaptionHandlerRef.current = closedCaptionHandler;
+          _call.on('call.closed_caption', closedCaptionHandler);
         }
 
         // Initialize Stream Chat after video joins successfully
@@ -206,7 +210,7 @@ export default function MeetingRoom() {
               time: msg.created_at
             })));
 
-            _channel.on('message.new', (event) => {
+            const messageHandler = (event: any) => {
               if (event.message) {
                 setChatMessages(prev => {
                   if (prev.some(m => m.id === event.message!.id)) return prev;
@@ -219,7 +223,9 @@ export default function MeetingRoom() {
                   }];
                 });
               }
-            });
+            };
+            messageHandlerRef.current = messageHandler;
+            _channel.on('message.new', messageHandler);
 
             chatClientRef.current = _chatClient;
             channelRef.current = _channel;
@@ -261,7 +267,9 @@ export default function MeetingRoom() {
       strictModeCleanupTimeout = setTimeout(() => {
         if (callRef.current) {
           try {
-            callRef.current.off('call.closed_caption');
+            if (closedCaptionHandlerRef.current) {
+              callRef.current.off('call.closed_caption', closedCaptionHandlerRef.current);
+            }
             if (userId === hostClerkId) {
               callRef.current.stopClosedCaptions().catch(() => {});
             }
@@ -277,10 +285,11 @@ export default function MeetingRoom() {
           }
           callRef.current = null;
         }
-
         if (channelRef.current) {
           try {
-            channelRef.current.off('message.new');
+            if (messageHandlerRef.current) {
+              channelRef.current.off('message.new', messageHandlerRef.current);
+            }
             channelRef.current.stopWatching().catch(() => {});
           } catch (err) {}
           channelRef.current = null;
@@ -353,8 +362,6 @@ export default function MeetingRoom() {
       </div>
     );
   }
-
-  const transcript = meeting?.transcript || [];
 
   return (
     <div className="h-screen bg-[#0F172A] flex flex-col font-sans overflow-hidden">

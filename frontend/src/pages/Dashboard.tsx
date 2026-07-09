@@ -20,32 +20,6 @@ import { format, isToday, isYesterday } from 'date-fns';
 
 
 
-const actionItemsMock = [
-  {
-    id: '1',
-    title: 'Update Q3 financial projections based on Acme Corp deal',
-    meeting: 'Client Discovery — Acme Corp',
-    assignee: { name: 'Shashank Raj', initials: 'SR', color: '#4F46E5' },
-    dueDate: 'Today',
-    isOverdue: false
-  },
-  {
-    id: '2',
-    title: 'Review and approve mobile app wireframes',
-    meeting: 'Design Review: Mobile App',
-    assignee: { name: 'Julia Liu', initials: 'JL', color: '#10B981' },
-    dueDate: 'Yesterday',
-    isOverdue: true
-  },
-  {
-    id: '3',
-    title: 'Send database index report to engineering channel',
-    meeting: 'Engineering Standup',
-    assignee: { name: 'Marcus Kim', initials: 'MK', color: '#3B82F6' },
-    dueDate: 'Tomorrow',
-    isOverdue: false
-  }
-];
 
 export default function Dashboard() {
   const navigate = useNavigate();

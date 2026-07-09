@@ -54,15 +54,15 @@ export default function ParticipantListPanel({ onClose, hostClerkId }: Participa
           
           // Check live status via Stream's publishedTracks arrays (or boolean fallbacks)
           // Stream uses 1/'audioTrack' for Mic, 2/'videoTrack' for Camera, 3/'SCREEN_SHARE' for sharing
-          const isAudioOn = p?.publishedTracks.includes(1) || p?.publishedTracks.includes('audioTrack') || (p as any).hasAudio;
+          const isAudioOn = (p?.publishedTracks as any[])?.includes(1) || (p?.publishedTracks as any[])?.includes('audioTrack') || (p as any).hasAudio;
           const isMicMuted = !isAudioOn;
           
-          const isVideoOn = p?.publishedTracks.includes(2) || p?.publishedTracks.includes('videoTrack') || (p as any).hasVideo;
+          const isVideoOn = (p?.publishedTracks as any[])?.includes(2) || (p?.publishedTracks as any[])?.includes('videoTrack') || (p as any).hasVideo;
           const isCameraOff = !isVideoOn;
           
-          const isSharingScreen = p?.publishedTracks.includes(3) || 
-                                  p?.publishedTracks.includes('SCREEN_SHARE') || 
-                                  p?.publishedTracks.includes('screenShareTrack') || 
+          const isSharingScreen = (p?.publishedTracks as any[])?.includes(3) || 
+                                  (p?.publishedTracks as any[])?.includes('SCREEN_SHARE') || 
+                                  (p?.publishedTracks as any[])?.includes('screenShareTrack') || 
                                   (p as any).hasScreenShare;
 
           return (
@@ -93,9 +93,21 @@ export default function ParticipantListPanel({ onClose, hostClerkId }: Participa
 
               {/* Status Icons */}
               <div className="flex items-center gap-2 text-[#9CA3AF]">
-                {isSharingScreen && <ScreenShare size={15} className="text-blue-500" title="Sharing Screen" />}
-                {isMicMuted && <MicOff size={15} className="text-red-500" title="Muted" />}
-                {isCameraOff && <VideoOff size={15} title="Camera Off" />}
+                {isSharingScreen && (
+                  <span title="Sharing Screen">
+                    <ScreenShare size={15} className="text-blue-500" />
+                  </span>
+                )}
+                {isMicMuted && (
+                  <span title="Muted">
+                    <MicOff size={15} className="text-red-500" />
+                  </span>
+                )}
+                {isCameraOff && (
+                  <span title="Camera Off">
+                    <VideoOff size={15} />
+                  </span>
+                )}
               </div>
             </div>
           );

@@ -1,7 +1,10 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
+import ActionItem from "../models/ActionItem.js";
 import { resolveParticipants } from "../lib/resolveParticipants.js";
+
+const generateJoinCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function createSession(req, res) {
   try {
@@ -23,6 +26,7 @@ export async function createSession(req, res) {
         callId, 
         startTime: new Date(scheduledFor), 
         status: "scheduled",
+        joinCode: generateJoinCode(),
         participants: allMemberIds
       });
       return res.status(201).json({ session });
@@ -34,6 +38,7 @@ export async function createSession(req, res) {
       callId, 
       startTime: new Date(), 
       status: "active",
+      joinCode: generateJoinCode(),
       participants: allMemberIds
     });
 
@@ -119,6 +124,7 @@ export async function getMyRecentSessions(req, res) {
         path: "host",
         select: "name profileImage email clerkId",
       })
+      .populate("actionItems")
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
@@ -138,9 +144,16 @@ export async function getSessionById(req, res) {
   try {
     const { id } = req.params;
 
-    const session = await Session.findById(id)
-      .populate("host", "name email profileImage clerkId")
-      .lean();
+    let session;
+    if (id.length === 6 && /^\d+$/.test(id)) {
+      session = await Session.findOne({ joinCode: id })
+        .populate("host", "name email profileImage clerkId")
+        .lean();
+    } else {
+      session = await Session.findById(id)
+        .populate("host", "name email profileImage clerkId")
+        .lean();
+    }
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
@@ -159,7 +172,12 @@ export async function joinSession(req, res) {
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
 
-    const session = await Session.findById(id);
+    let session;
+    if (id.length === 6 && /^\d+$/.test(id)) {
+      session = await Session.findOne({ joinCode: id });
+    } else {
+      session = await Session.findById(id);
+    }
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
@@ -223,6 +241,7 @@ export async function joinSession(req, res) {
 }
 
 export async function endSession(req, res) {
+  console.log("### endSession running — NO HARD DELETE VERSION ###");
   try {
     const { id } = req.params;
     const userId = req.user._id;
@@ -249,8 +268,6 @@ export async function endSession(req, res) {
       } catch (err) {
         console.error(`Failed to stop transcription for ${session.callId}: ${err.message}`);
       }
-
-      await call.delete({ hard: true });
 
       const channel = chatClient.channel("messaging", session.callId);
       await channel.delete();

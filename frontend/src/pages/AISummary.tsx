@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { useTeamStore } from '../store/store';
+import { format } from 'date-fns';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -34,8 +35,12 @@ export default function AISummary() {
 
   const { data: aiData, isLoading: loadingSummary } = useQuery({
     queryKey: ['aiSummary', id],
-    queryFn: () => api.getAISummary(id || ''),
-    enabled: !!id
+    queryFn: async () => api.getAISummary(id || '', await getToken() || ''),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state?.data?.status;
+      return (status === 'pending' || status === 'processing') ? 3000 : false;
+    }
   });
 
   const { mutate: addTask } = useMutation({
@@ -50,13 +55,25 @@ export default function AISummary() {
     if (syncedItems.has(item.id) || !meeting) return;
     
     addTask({
-      title: item.task,
+      title: item.text,
       assignee: item.assignee?.name || undefined,
-      dueDate: item.due
+      dueDate: item.dueDate
     });
     
     setSyncedItems(prev => new Set(prev).add(item.id));
   };
+
+  const mappedActionItems = aiData?.actionItems?.map((item: any) => {
+    const attendee = meeting?.attendees?.find(a => a.clerkId === item.assignee);
+    return {
+      ...item,
+      assignee: attendee || { name: 'Unassigned', initials: '?', color: '#9CA3AF' }
+    };
+  }) || [];
+
+  const keyDecisions = aiData?.summary
+    ? aiData.summary.split('\n').map((line: string) => line.replace(/^-?\s*/, '').trim()).filter((line: string) => line.length > 0)
+    : [];
 
   const isLoading = loadingMeeting || loadingSummary;
 
@@ -121,7 +138,18 @@ export default function AISummary() {
               Executive Summary
             </h2>
             <div className="text-[15px] text-[#374151] leading-relaxed space-y-4">
-              <p>{aiData?.summary || "No summary available."}</p>
+              {(aiData?.status === 'pending' || aiData?.status === 'processing') ? (
+                <div className="flex items-center gap-3 text-[#6B7280]">
+                  <div className="w-4 h-4 rounded-full border-2 border-[#4F46E5] border-t-transparent animate-spin"></div>
+                  Generating summary — this usually takes a minute or two...
+                </div>
+              ) : keyDecisions.length > 0 ? (
+                keyDecisions.map((paragraph: string, idx: number) => (
+                  <p key={idx}>{paragraph}</p>
+                ))
+              ) : (
+                <p>No summary available.</p>
+              )}
             </div>
           </section>
 
@@ -132,7 +160,7 @@ export default function AISummary() {
               Action Items
             </h2>
             <div className="space-y-3">
-              {aiData?.actionItems?.length ? aiData.actionItems.map((item: any) => (
+              {mappedActionItems.length ? mappedActionItems.map((item: any) => (
                 <div key={item.id} className="flex items-start gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:border-[#D1D5DB] transition-colors">
                   <div className="mt-1">
                     <input 
@@ -142,7 +170,7 @@ export default function AISummary() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] text-[#111827] font-medium">{item.task}</p>
+                    <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
                     <div className="flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
                       <div className="flex items-center gap-1.5">
                         <div 
@@ -154,7 +182,7 @@ export default function AISummary() {
                         {item.assignee.name}
                       </div>
                       <span className="flex items-center gap-1">
-                        <Calendar size={12} /> Due {item.due}
+                        <Calendar size={12} /> {item.dueDate ? format(new Date(item.dueDate), 'MMM d') : 'No due date'}
                       </span>
                     </div>
                   </div>
@@ -176,18 +204,16 @@ export default function AISummary() {
           <section className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
             <h2 className="text-[18px] font-semibold text-[#111827] mb-4">Key Decisions</h2>
             <ul className="space-y-4">
-              {[
-                "Target mobile app launch for August 15th.",
-                "Defer API rate limiting to Q4.",
-                "Allocate 2 additional engineers to the mobile team starting next week."
-              ].map((decision, idx) => (
+              {keyDecisions.length > 0 ? keyDecisions.map((decision: string, idx: number) => (
                 <li key={idx} className="flex gap-3">
                   <span className="w-6 h-6 rounded-full bg-[#F3F4F6] text-[#6B7280] text-[12px] font-bold flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
                   <span className="text-[14px] text-[#374151] pt-0.5">{decision}</span>
                 </li>
-              ))}
+              )) : (
+                <li className="text-[14px] text-[#6B7280] italic">No key points extracted yet.</li>
+              )}
             </ul>
           </section>
         </div>

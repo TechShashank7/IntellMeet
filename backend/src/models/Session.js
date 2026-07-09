@@ -7,6 +7,10 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    joinCode: {
+      type: String,
+      unique: true,
+    },
     host: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

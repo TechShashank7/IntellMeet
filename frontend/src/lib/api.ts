@@ -18,17 +18,27 @@ function mapSessionToMeeting(session: any): Meeting {
     duration: '', // raw field
     status: session.status,
     summary: session.summary || '',
-    actionItems: [], // for now
+    actionItems: (session.actionItems || []).map((ai: any) => ({
+      id: ai._id || Math.random().toString(),
+      title: ai.text || 'Untitled task',
+      meeting: session.topic || 'Meeting',
+      assignee: { name: 'Unassigned', initials: '?', color: '#9CA3AF' },
+      dueDate: ai.dueDate ? format(new Date(ai.dueDate), 'MMM d') : 'No due date',
+      isOverdue: ai.dueDate ? new Date(ai.dueDate) < new Date() : false
+    })),
     attendees: (session.resolvedParticipants || []).map((u: any) => ({
       name: u.name,
       initials: getInitials(u.name),
-      color: getAvatarColor(u.clerkId)
+      color: getAvatarColor(u.clerkId),
+      clerkId: u.clerkId,
+      profileImage: u.profileImage || ''
     })),
     startTime: session.startTime,
     endTime: session.endTime,
     estimatedDuration: session.estimatedDuration,
     callId: session.callId,
-    hostClerkId: session.host?.clerkId
+    hostClerkId: session.host?.clerkId,
+    joinCode: session.joinCode
   };
 }
 
@@ -195,16 +205,25 @@ export const api = {
     return useMeetingStore.getState().meetings.find(m => m.id === id);
   },
 
-  getAISummary: async (meetingId: string): Promise<{ summary?: string; actionItems: any[] }> => {
-    await delay(SIMULATED_DELAY);
-    const meeting = useMeetingStore.getState().meetings.find(m => m.id === meetingId);
-    if (!meeting) {
-      throw new Error("Meeting not found");
+  getAISummary: async (meetingId: string, token: string): Promise<{ summary?: string; actionItems: any[]; status?: string }> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/ai/meetings/${meetingId}/summary`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch AI summary');
+      return await res.json();
+    } catch (err) {
+      console.warn('Failed to fetch real AI summary, falling back to mock data', err);
+      await delay(SIMULATED_DELAY);
+      const meeting = useMeetingStore.getState().meetings.find(m => m.id === meetingId);
+      if (!meeting) {
+        throw new Error("Meeting not found");
+      }
+      return {
+        summary: meeting.summary,
+        actionItems: meeting.actionItems
+      };
     }
-    return {
-      summary: meeting.summary,
-      actionItems: meeting.actionItems
-    };
   },
 
   // Tasks

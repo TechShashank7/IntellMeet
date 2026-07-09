@@ -13,7 +13,8 @@ import {
   Video,
   LogIn,
   MonitorUp,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -53,6 +54,12 @@ export default function Dashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  
+  const [isNewMeetingModalOpen, setIsNewMeetingModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [meetingTopic, setMeetingTopic] = useState('');
+  const [joinMeetingId, setJoinMeetingId] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   
   const queryClient = useQueryClient();
   const { currentTeamId } = useTeamStore();
@@ -99,24 +106,39 @@ export default function Dashboard() {
   });
 
 
-  const handleNewMeeting = async () => {
-    const topic = window.prompt('Meeting topic:', 'Quick Sync');
-    if (!topic || topic.trim() === '') return;
+  const handleNewMeeting = () => {
+    setMeetingTopic('');
+    setIsNewMeetingModalOpen(true);
+  };
+
+  const submitNewMeeting = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!meetingTopic.trim()) return;
     try {
+      setIsCreating(true);
       const token = await getToken();
       if (!token) return;
-      const session = await api.createMeeting(token, topic);
+      const session = await api.createMeeting(token, meetingTopic);
+      setIsNewMeetingModalOpen(false);
       navigate(`/meeting/${session._id}`);
     } catch (error) {
       console.error('Error creating meeting:', error);
       window.alert('Failed to create meeting, please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleJoinWithCode = () => {
-    const id = window.prompt('Enter meeting ID:');
-    if (!id || id.trim() === '') return;
-    navigate(`/meeting/${id.trim()}`);
+    setJoinMeetingId('');
+    setIsJoinModalOpen(true);
+  };
+
+  const submitJoinMeeting = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!joinMeetingId.trim()) return;
+    setIsJoinModalOpen(false);
+    navigate(`/meeting/${joinMeetingId.trim()}`);
   };
 
   const handleJoinMeeting = (id: string) => {
@@ -220,6 +242,10 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const check28Meeting = recentMeetings.find((m: any) => m.title?.toLowerCase().includes('check 28'));
+  const lastMeetingWithActionItems = check28Meeting || recentMeetings.find((m: any) => m.actionItems && m.actionItems.length > 0);
+  const myActionItems = lastMeetingWithActionItems?.actionItems || [];
 
   return (
     <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter']">
@@ -441,10 +467,12 @@ export default function Dashboard() {
           </div>
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden">
             <div className="flex flex-col">
-              {actionItemsMock.map((item, index) => (
+              {myActionItems.length === 0 ? (
+                <div className="p-[16px] text-[#6B7280] text-[14px]">No action items from recent meetings.</div>
+              ) : myActionItems.map((item: any, index: number) => (
                 <div 
                   key={item.id} 
-                  className={`p-[16px] flex items-center justify-between hover:bg-[#F9FAFB] transition-colors group ${index !== actionItemsMock.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                  className={`p-[16px] flex items-center justify-between hover:bg-[#F9FAFB] transition-colors group ${index !== myActionItems.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
                 >
                   <div className="flex items-center gap-4 flex-1 overflow-hidden">
                     <input 
@@ -485,6 +513,74 @@ export default function Dashboard() {
         </div>
         
       </div>
+      
+      {/* Modals */}
+      {isNewMeetingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
+              <h3 className="text-[16px] font-[600] text-[#111827]">Create New Meeting</h3>
+              <button onClick={() => setIsNewMeetingModalOpen(false)} className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors p-1 rounded-full hover:bg-[#F3F4F6]">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={submitNewMeeting} className="p-5">
+              <div className="mb-5">
+                <label className="block text-[13px] font-[500] text-[#374151] mb-2">Meeting Topic</label>
+                <input 
+                  type="text" 
+                  value={meetingTopic}
+                  onChange={(e) => setMeetingTopic(e.target.value)}
+                  className="w-full border border-[#D1D5DB] rounded-lg px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setIsNewMeetingModalOpen(false)} className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isCreating || !meetingTopic.trim()} className="px-4 py-2 bg-[#4F46E5] text-white text-[14px] font-[500] rounded-lg hover:bg-[#4338CA] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                  {isCreating ? 'Creating...' : 'Create Meeting'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isJoinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
+              <h3 className="text-[16px] font-[600] text-[#111827]">Join with Code</h3>
+              <button onClick={() => setIsJoinModalOpen(false)} className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors p-1 rounded-full hover:bg-[#F3F4F6]">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={submitJoinMeeting} className="p-5">
+              <div className="mb-5">
+                <label className="block text-[13px] font-[500] text-[#374151] mb-2">Meeting ID</label>
+                <input 
+                  type="text" 
+                  value={joinMeetingId}
+                  onChange={(e) => setJoinMeetingId(e.target.value)}
+                  className="w-full border border-[#D1D5DB] rounded-lg px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent outline-none transition-all"
+                  placeholder="Enter meeting ID"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setIsJoinModalOpen(false)} className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={!joinMeetingId.trim()} className="px-4 py-2 bg-[#4F46E5] text-white text-[14px] font-[500] rounded-lg hover:bg-[#4338CA] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  Join Meeting
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

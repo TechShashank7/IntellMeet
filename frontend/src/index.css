@@ -45,3 +45,16 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+/* Override Stream SDK ParticipantView defaults to match Google Meet adaptive tiling (crop-fill) */
+.str-video__participant-view {
+  height: 100% !important;
+  width: 100% !important;
+  aspect-ratio: auto !important;
+}
+
+.str-video__video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}

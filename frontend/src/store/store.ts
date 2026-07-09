@@ -10,6 +10,8 @@ export interface Attendee {
   initials: string;
   name: string;
   color: string;
+  clerkId?: string;
+  profileImage?: string;
 }
 
 export interface ActionItem {
@@ -36,6 +38,7 @@ export interface Meeting {
   estimatedDuration?: number;
   callId?: string;
   hostClerkId?: string;
+  joinCode?: string;
 }
 
 export interface Task {

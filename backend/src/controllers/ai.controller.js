@@ -14,7 +14,13 @@ import { generateMeetingSummary } from "../services/ai.service.js";
  * both outside the scope of this controller.
  */
 const summarizeMeeting = asyncHandler(async (req, res) => {
-  const session = await Session.findById(req.params.meetingId);
+  const id = req.params.meetingId;
+  let session;
+  if (id && id.length === 6 && /^\d+$/.test(id)) {
+    session = await Session.findOne({ joinCode: id });
+  } else {
+    session = await Session.findById(id);
+  }
 
   if (!session) {
     res.status(404);
@@ -64,7 +70,13 @@ const summarizeMeeting = asyncHandler(async (req, res) => {
  * GET /api/ai/sessions/:sessionId/summary
  */
 const getSessionSummary = asyncHandler(async (req, res) => {
-  const session = await Session.findById(req.params.meetingId).populate("actionItems");
+  const id = req.params.meetingId;
+  let session;
+  if (id && id.length === 6 && /^\d+$/.test(id)) {
+    session = await Session.findOne({ joinCode: id }).populate("actionItems");
+  } else {
+    session = await Session.findById(id).populate("actionItems");
+  }
 
   if (!session) {
     res.status(404);

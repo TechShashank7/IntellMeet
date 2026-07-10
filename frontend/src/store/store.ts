@@ -39,6 +39,7 @@ export interface Meeting {
   callId?: string;
   hostClerkId?: string;
   joinCode?: string;
+  ratings?: { clerkId: string; rating: number | null; skipped: boolean; ratedAt?: string }[];
 }
 
 export interface Task {
@@ -50,6 +51,8 @@ export interface Task {
   due: string;
   sourceMeetingId?: string;
   sourceMeetingTitle?: string;
+  description?: string;
+  dueDate?: string | null;
 }
 
 

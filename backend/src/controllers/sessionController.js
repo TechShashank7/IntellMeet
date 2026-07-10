@@ -279,11 +279,148 @@ export async function endSession(req, res) {
     }
 
     session.status = "completed";
+    session.endTime = new Date();
+    if (session.startTime) {
+      session.duration = Math.max(0, Math.floor((session.endTime.getTime() - session.startTime.getTime()) / 1000));
+    }
     await session.save();
 
     res.status(200).json({ session, message: "Session ended successfully" });
   } catch (error) {
     console.log("Error in endSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function rateSession(req, res) {
+  try {
+    const { id } = req.params;
+    const clerkId = req.user.clerkId;
+    const { rating, skipped } = req.body;
+
+    let session;
+    if (id && id.length === 6 && /^\d+$/.test(id)) {
+      session = await Session.findOne({ joinCode: id });
+    } else {
+      session = await Session.findById(id);
+    }
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    const isValidRating = Number.isInteger(rating) && rating >= 1 && rating <= 5;
+    const isSkipped = skipped === true;
+
+    if ((!isValidRating && !isSkipped) || (isValidRating && isSkipped)) {
+      return res.status(400).json({ message: "Provide either a valid rating (1-5) or skipped=true" });
+    }
+
+    if (!session.ratings) {
+      session.ratings = [];
+    }
+
+    const existingIndex = session.ratings.findIndex(r => r.clerkId === clerkId);
+
+    if (existingIndex !== -1) {
+      session.ratings[existingIndex].rating = isValidRating ? rating : null;
+      session.ratings[existingIndex].skipped = isSkipped;
+      session.ratings[existingIndex].ratedAt = new Date();
+    } else {
+      session.ratings.push({
+        clerkId,
+        rating: isValidRating ? rating : null,
+        skipped: isSkipped,
+        ratedAt: new Date()
+      });
+    }
+
+    await session.save();
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.log("Error in rateSession controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function getMeetingStats(req, res) {
+  try {
+    const userId = req.user._id;
+    const clerkId = req.user.clerkId;
+
+    const startOfThisWeek = new Date();
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    startOfThisWeek.setDate(startOfThisWeek.getDate() - startOfThisWeek.getDay());
+
+    const startOfNextWeek = new Date(startOfThisWeek);
+    startOfNextWeek.setDate(startOfThisWeek.getDate() + 7);
+
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+    const filter = { $or: [{ host: userId }, { participants: clerkId }] };
+
+    const thisWeekCount = await Session.countDocuments({ 
+      ...filter, 
+      startTime: { $gte: startOfThisWeek, $lt: startOfNextWeek } 
+    });
+
+    const lastWeekCount = await Session.countDocuments({ 
+      ...filter, 
+      startTime: { $gte: startOfLastWeek, $lt: startOfThisWeek } 
+    });
+
+    res.status(200).json({ thisWeekCount, lastWeekCount });
+  } catch (error) {
+    console.log("Error in getMeetingStats controller:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+export async function getMeetingAnalytics(req, res) {
+  try {
+    const userId = req.user._id;
+    const clerkId = req.user.clerkId;
+    const filter = { $or: [{ host: userId }, { participants: clerkId }], status: "completed" };
+
+    const sessions = await Session.find(filter).select("duration startTime ratings").lean();
+
+    const totalMeetings = sessions.length;
+    const totalDurationSeconds = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const avgDurationMinutes = totalMeetings > 0 ? Math.round((totalDurationSeconds / totalMeetings) / 60) : 0;
+    const totalHours = Math.round((totalDurationSeconds / 3600) * 10) / 10;
+
+    const myRatings = sessions
+      .flatMap(s => s.ratings || [])
+      .filter(r => r.clerkId === clerkId && r.rating != null);
+    const avgRating = myRatings.length > 0
+      ? Math.round((myRatings.reduce((sum, r) => sum + r.rating, 0) / myRatings.length) * 10) / 10
+      : null;
+
+    const ratingDistribution = [1, 2, 3, 4, 5].map(star => ({
+      stars: star,
+      count: myRatings.filter(r => r.rating === star).length
+    }));
+
+    const now = new Date();
+    const weeklyTrend = [];
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setHours(0, 0, 0, 0);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (i * 7));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+      const count = sessions.filter(s => {
+        const st = new Date(s.startTime);
+        return st >= weekStart && st < weekEnd;
+      }).length;
+      weeklyTrend.push({ week: weekStart.toISOString().split('T')[0], count });
+    }
+
+    res.status(200).json({
+      totalMeetings, avgDurationMinutes, totalHours, avgRating,
+      ratingCount: myRatings.length, ratingDistribution, weeklyTrend
+    });
+  } catch (error) {
+    console.log("Error in getMeetingAnalytics controller:", error.message);
+    res.status(500).json({ message: error.message });
   }
 }

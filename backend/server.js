@@ -14,6 +14,7 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import taskRoutes from "./src/routes/taskRoutes.js";
 import aiRoutes from "./src/routes/aiRoutes.js";
 import webhookRoutes from "./src/routes/webhookRoutes.js";
+import inviteRoutes from "./src/routes/inviteRoutes.js";
 
 const app = express();
 const __dirname = path.resolve();
@@ -27,7 +28,8 @@ app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/chat", chatRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/teams", teamRoutes);
-app.use("/api/tasks", taskRoutes); // task.routes.js already defines /teams/:teamId/tasks and /tasks/:id
+app.use("/api/invites", inviteRoutes);
+app.use("/api", taskRoutes); // task.routes.js already defines /teams/:teamId/tasks and /tasks/:id
 app.use("/api/ai", aiRoutes);
 
 if (ENV.NODE_ENV === "production") {

@@ -126,7 +126,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
   // 1 Participant (Just yourself)
   if (participants.length === 1 && localParticipant) {
     return (
-      <div className="w-full h-full relative rounded-xl overflow-hidden">
+      <div className="w-full h-full relative rounded-xl overflow-hidden [&_video]:!object-cover">
         <ParticipantView participant={localParticipant} />
       </div>
     );

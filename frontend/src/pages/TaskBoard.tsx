@@ -30,10 +30,33 @@ export default function TaskBoard() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+  // Filter states
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterAssignee, setFilterAssignee] = useState<string>('all');
+
+  // Task detail modal states
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAssignee, setEditAssignee] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editPriority, setEditPriority] = useState<string>('medium');
+
+  // Mouse coords to differentiate click from drag
+  const [dragStartCoords, setDragStartCoords] = useState<{ x: number; y: number } | null>(null);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', currentTeamId],
     queryFn: async () => api.getTasks(currentTeamId || '', await getToken() || ''),
+    enabled: !!currentTeamId,
+  });
+
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['teamMembers', currentTeamId],
+    queryFn: async () => api.getTeamMembers(currentTeamId || '', await getToken() || ''),
     enabled: !!currentTeamId,
   });
 
@@ -46,7 +69,7 @@ export default function TaskBoard() {
   });
 
   const { mutate: addTask } = useMutation({
-    mutationFn: async (taskData: { title: string; assignee?: string; dueDate?: string }) => 
+    mutationFn: async (taskData: { title: string; assignee?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => 
       api.addTask(currentTeamId || '', await getToken() || '', taskData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
@@ -54,23 +77,116 @@ export default function TaskBoard() {
       setNewTaskTitle('');
       setNewTaskAssignee('');
       setNewTaskDue('');
+      setNewTaskPriority('medium');
+    }
+  });
+
+  const { mutate: updateTask } = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => 
+      api.updateTask(id, await getToken() || '', updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
+      setSelectedTask(null);
+    }
+  });
+
+  const { mutate: deleteTask } = useMutation({
+    mutationFn: async (id: string) => 
+      api.deleteTask(id, await getToken() || ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
+      setSelectedTask(null);
     }
   });
 
   const handleAddTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    addTask({ title: newTaskTitle, assignee: newTaskAssignee || undefined, dueDate: newTaskDue || undefined });
+    addTask({ 
+      title: newTaskTitle, 
+      assignee: newTaskAssignee || undefined, 
+      dueDate: newTaskDue || undefined, 
+      priority: newTaskPriority 
+    });
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTask) return;
+    updateTask({
+      id: selectedTask.id,
+      updates: {
+        title: editTitle,
+        description: editDescription,
+        assignee: editAssignee || null,
+        dueDate: editDueDate || null,
+        priority: editPriority
+      }
+    });
+  };
+
+  const handleDeleteTask = () => {
+    if (!selectedTask) return;
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      deleteTask(selectedTask.id);
+    }
+  };
+
+  const handleOpenDetailModal = (task: Task) => {
+    setSelectedTask(task);
+    setEditTitle(task.title);
+    setEditDescription(task.description || '');
+    setEditAssignee(task.assignee?.clerkId || '');
+    let formattedDate = '';
+    if (task.dueDate) {
+      formattedDate = new Date(task.dueDate).toISOString().split('T')[0];
+    }
+    setEditDueDate(formattedDate);
+    setEditPriority(task.priority || 'medium');
+  };
+
+  const handleTaskMouseDown = (e: React.MouseEvent) => {
+    setDragStartCoords({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleTaskMouseUp = (e: React.MouseEvent, task: Task) => {
+    if (!dragStartCoords) return;
+    const dx = Math.abs(e.clientX - dragStartCoords.x);
+    const dy = Math.abs(e.clientY - dragStartCoords.y);
+    if (dx < 5 && dy < 5) {
+      handleOpenDetailModal(task);
+    }
+    setDragStartCoords(null);
   };
 
   const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return tasks;
-    const lowerQuery = searchQuery.toLowerCase();
-    return tasks.filter(t => 
-      t.title.toLowerCase().includes(lowerQuery) || 
-      t.sourceMeetingTitle?.toLowerCase().includes(lowerQuery)
-    );
-  }, [tasks, searchQuery]);
+    let result = tasks;
+
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.title.toLowerCase().includes(lowerQuery) || 
+        t.sourceMeetingTitle?.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    if (filterPriority !== 'all') {
+      result = result.filter(t => t.priority === filterPriority);
+    }
+
+    if (filterAssignee !== 'all') {
+      if (filterAssignee === 'unassigned') {
+        result = result.filter(t => !t.assignee || t.assignee.name === 'Unassigned');
+      } else {
+        const member = teamMembers.find((m: any) => m.clerkId === filterAssignee);
+        if (member) {
+          result = result.filter(t => t.assignee.name === member.name);
+        }
+      }
+    }
+
+    return result;
+  }, [tasks, searchQuery, filterPriority, filterAssignee, teamMembers]);
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
@@ -121,28 +237,47 @@ export default function TaskBoard() {
                   type="text" 
                   value={newTaskTitle}
                   onChange={e => setNewTaskTitle(e.target.value)}
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee (Optional)</label>
-                <input 
-                  type="text" 
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee</label>
+                <select 
                   value={newTaskAssignee}
                   onChange={e => setNewTaskAssignee(e.target.value)}
-                  placeholder="e.g. John Doe or clerkId"
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
-                />
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((member: any) => (
+                    <option key={member.clerkId} value={member.clerkId}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date (Optional)</label>
-                <input 
-                  type="date" 
-                  value={newTaskDue}
-                  onChange={e => setNewTaskDue(e.target.value)}
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date</label>
+                  <input 
+                    type="date" 
+                    value={newTaskDue}
+                    onChange={e => setNewTaskDue(e.target.value)}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Priority</label>
+                  <select 
+                    value={newTaskPriority}
+                    onChange={e => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button 
@@ -181,9 +316,71 @@ export default function TaskBoard() {
               className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-[240px]"
             />
           </div>
-          <button className="px-3 py-2 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2">
-            <Filter size={16} /> Filter
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+              className={`px-3 py-2 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2 ${
+                filterPriority !== 'all' || filterAssignee !== 'all' ? 'border-[#4F46E5] text-[#4F46E5]' : ''
+              }`}
+            >
+              <Filter size={16} /> Filter
+            </button>
+            {isFilterDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-[#E5E7EB] rounded-lg shadow-lg p-4 z-50">
+                <h3 className="text-xs font-semibold text-[#374151] uppercase tracking-wider mb-3">Filters</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">Priority</label>
+                    <select
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value)}
+                      className="w-full border border-[#E5E7EB] rounded px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white"
+                    >
+                      <option value="all">All Priorities</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">Assignee</label>
+                    <select
+                      value={filterAssignee}
+                      onChange={(e) => setFilterAssignee(e.target.value)}
+                      className="w-full border border-[#E5E7EB] rounded px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white"
+                    >
+                      <option value="all">All Assignees</option>
+                      <option value="unassigned">Unassigned</option>
+                      {teamMembers.map((member: any) => (
+                        <option key={member.clerkId} value={member.clerkId}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-[#F3F4F6]">
+                  {(filterPriority !== 'all' || filterAssignee !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setFilterPriority('all');
+                        setFilterAssignee('all');
+                      }}
+                      className="text-[11px] font-medium text-[#EF4444] hover:underline"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsFilterDropdownOpen(false)}
+                    className="px-2.5 py-1 text-[11px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2"
@@ -235,15 +432,28 @@ export default function TaskBoard() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onDragEnd={handleDragEnd}
+                        onMouseDown={handleTaskMouseDown}
+                        onMouseUp={(e) => handleTaskMouseUp(e, task)}
                         className="bg-white p-4 rounded-lg border border-[#E5E7EB] shadow-sm cursor-grab active:cursor-grabbing hover:border-[#D1D5DB] transition-colors"
                       >
                         <div className="flex items-start justify-between mb-2 gap-4">
                           <h3 className="text-[14px] font-medium text-[#111827] leading-tight">
                             {task.title}
                           </h3>
-                          {task.priority === 'high' && (
-                            <AlertCircle size={14} className="text-[#EF4444] flex-shrink-0" />
-                          )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {task.priority && (
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                task.priority === 'high' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                task.priority === 'medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                'bg-slate-50 text-slate-600 border border-slate-100'
+                              }`}>
+                                {task.priority}
+                              </span>
+                            )}
+                            {task.priority === 'high' && (
+                              <AlertCircle size={13} className="text-[#EF4444] flex-shrink-0" />
+                            )}
+                          </div>
                         </div>
                         
                         {task.sourceMeetingTitle && (
@@ -277,6 +487,99 @@ export default function TaskBoard() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedTask && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg w-[450px] p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-lg font-bold text-[#111827]">Task Details</h2>
+              <button 
+                type="button"
+                onClick={handleDeleteTask}
+                className="text-xs font-semibold text-[#EF4444] hover:bg-[#FEF2F2] px-2.5 py-1.5 rounded transition-colors"
+              >
+                Delete Task
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">Title *</label>
+                <input 
+                  type="text" 
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">Description</label>
+                <textarea 
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
+                  placeholder="Add a detailed description..."
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee</label>
+                <select 
+                  value={editAssignee}
+                  onChange={e => setEditAssignee(e.target.value)}
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((member: any) => (
+                    <option key={member.clerkId} value={member.clerkId}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date</label>
+                  <input 
+                    type="date" 
+                    value={editDueDate}
+                    onChange={e => setEditDueDate(e.target.value)}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Priority</label>
+                  <select 
+                    value={editPriority}
+                    onChange={e => setEditPriority(e.target.value)}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F3F4F6]">
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedTask(null)}
+                  className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

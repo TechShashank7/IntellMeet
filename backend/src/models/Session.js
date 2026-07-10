@@ -33,6 +33,7 @@ const meetingSchema = new mongoose.Schema(
     },
     startTime: { type: Date, required: true },
     endTime: { type: Date },
+    duration: { type: Number, default: 0 },
     // stream video call ID
     callId: {
       type: String,
@@ -61,6 +62,14 @@ const meetingSchema = new mongoose.Schema(
       enum: ["pending", "processing", "completed", "failed"],
       default: "pending",
     },
+    ratings: [
+      {
+        clerkId: { type: String, required: true },
+        rating: { type: Number, min: 1, max: 5, default: null },
+        skipped: { type: Boolean, default: false },
+        ratedAt: { type: Date, default: Date.now },
+      }
+    ],
   },
   { timestamps: true }
 );

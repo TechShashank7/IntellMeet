@@ -27,7 +27,7 @@ const assertTeamMember = async (teamId, clerkId, res) => {
  */
 const createTask = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const { title, description = "", assignee = null, dueDate = null } = req.body;
+  const { title, description = "", assignee = null, dueDate = null, priority = "medium" } = req.body;
 
   await assertTeamMember(teamId, req.user.clerkId, res);
 
@@ -36,7 +36,7 @@ const createTask = asyncHandler(async (req, res) => {
     throw new Error("Task title is required");
   }
 
-  const task = await Task.create({ title, description, teamId, assignee, dueDate });
+  const task = await Task.create({ title, description, teamId, assignee, dueDate, priority });
   res.status(201).json(task);
 });
 
@@ -89,7 +89,7 @@ const updateTask = asyncHandler(async (req, res) => {
 
   await assertTeamMember(task.teamId, req.user.clerkId, res);
 
-  const allowedFields = ["title", "description", "assignee", "status", "dueDate"];
+  const allowedFields = ["title", "description", "assignee", "status", "dueDate", "priority"];
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) {
       task[field] = req.body[field];

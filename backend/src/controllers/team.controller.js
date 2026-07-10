@@ -1,4 +1,5 @@
 import asyncHandler from "express-async-handler";
+import Invite from "../models/Invite.js";
 import Team from "../models/Team.js";
 import User from "../models/User.js";
 import { resolveParticipants } from "../lib/resolveParticipants.js";
@@ -31,7 +32,7 @@ const createTeam = asyncHandler(async (req, res) => {
  * Lists teams the current user belongs to.
  */
 const getTeams = asyncHandler(async (req, res) => {
-  const teams = await Team.find({ members: req.user.clerkId }).sort({ createdAt: -1 });
+  const teams = await Team.find({ members: req.user.clerkId }).sort({ name: 1 });
   res.status(200).json(teams);
 });
 
@@ -160,7 +161,7 @@ const inviteTeamMemberByEmail = asyncHandler(async (req, res) => {
 
   if (team.admin !== req.user.clerkId) {
     res.status(403);
-    throw new Error("Only the team admin can add members");
+    throw new Error("Only the team admin can invite members");
   }
 
   if (!email) {
@@ -176,13 +177,83 @@ const inviteTeamMemberByEmail = asyncHandler(async (req, res) => {
 
   const clerkId = invitedUser.clerkId;
 
-  if (!team.members.includes(clerkId)) {
-    team.members.push(clerkId);
-    await team.save();
-    await User.updateOne({ clerkId }, { $addToSet: { teams: team._id } });
+  if (team.members.includes(clerkId)) {
+    res.status(400);
+    throw new Error(`${invitedUser.name} is already a member of this team`);
   }
 
-  res.status(200).json(team);
+  const existingInvite = await Invite.findOne({ team: team._id, invitedClerkId: clerkId, status: "pending" });
+  if (existingInvite) {
+    res.status(400);
+    throw new Error(`${invitedUser.name} already has a pending invite to this team`);
+  }
+
+  await Invite.create({
+    team: team._id,
+    teamName: team.name,
+    invitedClerkId: clerkId,
+    invitedByClerkId: req.user.clerkId,
+    invitedByName: req.user.name,
+  });
+
+  res.status(200).json({ message: `Invite sent to ${invitedUser.name}` });
+});
+
+const getMyInvites = asyncHandler(async (req, res) => {
+  const invites = await Invite.find({ invitedClerkId: req.user.clerkId, status: "pending" }).sort({ createdAt: -1 });
+  res.status(200).json(invites);
+});
+
+const acceptInvite = asyncHandler(async (req, res) => {
+  const invite = await Invite.findById(req.params.id);
+  if (!invite || invite.invitedClerkId !== req.user.clerkId) {
+    res.status(404);
+    throw new Error("Invite not found");
+  }
+  if (invite.status !== "pending") {
+    res.status(400);
+    throw new Error("This invite has already been responded to");
+  }
+
+  const team = await Team.findById(invite.team);
+  if (team && !team.members.includes(req.user.clerkId)) {
+    team.members.push(req.user.clerkId);
+    await team.save();
+    await User.updateOne({ clerkId: req.user.clerkId }, { $addToSet: { teams: team._id } });
+  }
+
+  await invite.deleteOne();
+  res.status(200).json({ message: "Invite accepted" });
+});
+
+const declineInvite = asyncHandler(async (req, res) => {
+  const invite = await Invite.findById(req.params.id);
+  if (!invite || invite.invitedClerkId !== req.user.clerkId) {
+    res.status(404);
+    throw new Error("Invite not found");
+  }
+  await invite.deleteOne();
+  res.status(200).json({ message: "Invite declined" });
+});
+
+const leaveTeam = asyncHandler(async (req, res) => {
+  const team = await Team.findById(req.params.id);
+  if (!team) {
+    res.status(404);
+    throw new Error("Team not found");
+  }
+  if (team.admin === req.user.clerkId) {
+    res.status(400);
+    throw new Error("The team admin cannot leave the team");
+  }
+  if (!team.members.includes(req.user.clerkId)) {
+    res.status(400);
+    throw new Error("You are not a member of this team");
+  }
+  team.members = team.members.filter((m) => m !== req.user.clerkId);
+  await team.save();
+  await User.updateOne({ clerkId: req.user.clerkId }, { $pull: { teams: team._id } });
+  res.status(200).json({ message: "Left the team" });
 });
 
 export { 
@@ -192,5 +263,9 @@ export {
   addTeamMember, 
   removeTeamMember,
   getTeamMembers,
-  inviteTeamMemberByEmail
+  inviteTeamMemberByEmail,
+  getMyInvites,
+  acceptInvite,
+  declineInvite,
+  leaveTeam
 };

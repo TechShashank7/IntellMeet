@@ -8,6 +8,7 @@ import {
   removeTeamMember,
   getTeamMembers,
   inviteTeamMemberByEmail,
+  leaveTeam,
 } from "../controllers/team.controller.js";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.post("/:id/members", addTeamMember); // body: { clerkId }
 router.delete("/:id/members/:clerkId", removeTeamMember);
 router.get("/:id/members", getTeamMembers);
 router.post("/:id/members/invite", inviteTeamMemberByEmail);
+router.post("/:id/leave", leaveTeam);
 
 export default router;

@@ -37,3 +37,11 @@ export function formatMeetingDuration(startTime: string, endTime?: string, estim
   const minutes = diffMinutes % 60;
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
+
+export function formatElapsedTime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+}

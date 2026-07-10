@@ -38,7 +38,8 @@ function mapSessionToMeeting(session: any): Meeting {
     estimatedDuration: session.estimatedDuration,
     callId: session.callId,
     hostClerkId: session.host?.clerkId,
-    joinCode: session.joinCode
+    joinCode: session.joinCode,
+    ratings: session.ratings || []
   };
 }
 
@@ -112,6 +113,47 @@ export const api = {
     }
   },
 
+  getMyInvites: async (token: string): Promise<any[]> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/invites`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Failed to fetch invites');
+      return await res.json();
+    } catch (err) {
+      console.warn('Failed to fetch invites', err);
+      return [];
+    }
+  },
+
+  respondToInvite: async (id: string, action: 'accept' | 'decline', token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/invites/${id}/${action}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Failed to ${action} invite`);
+  },
+
+  leaveTeam: async (teamId: string, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/teams/${teamId}/leave`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Failed to leave team');
+    }
+  },
+
+  removeTeamMember: async (teamId: string, clerkId: string, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/teams/${teamId}/members/${clerkId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Failed to remove member');
+    }
+  },
+
   getStreamToken: async (token: string): Promise<{ token: string; userId: string; userName: string; userImage: string }> => {
     const res = await fetch(`${API_BASE_URL}/chat/token`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -137,6 +179,44 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Failed to end meeting on backend');
+  },
+
+  rateMeeting: async (id: string, token: string, payload: { rating?: number; skipped?: boolean }): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/meetings/${id}/rate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Failed to rate meeting');
+    } catch (err) {
+      console.warn('Failed to rate meeting', err);
+    }
+  },
+
+  getMeetingStats: async (token: string): Promise<{ thisWeekCount: number; lastWeekCount: number }> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/meetings/stats`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Failed to fetch meeting stats');
+      return await res.json();
+    } catch (err) {
+      console.warn('Failed to fetch real meeting stats, falling back to zero', err);
+      return { thisWeekCount: 0, lastWeekCount: 0 };
+    }
+  },
+
+  getMeetingAnalytics: async (token: string): Promise<any> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/meetings/analytics`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Failed to fetch analytics');
+      return await res.json();
+    } catch (err) {
+      console.warn('Failed to fetch real analytics, falling back to empty', err);
+      return { totalMeetings: 0, avgDurationMinutes: 0, totalHours: 0, avgRating: null, ratingCount: 0, ratingDistribution: [], weeklyTrend: [] };
+    }
   },
 
   // Meetings
@@ -240,12 +320,13 @@ export const api = {
         else if (t.status === 'in_review') frontendStatus = 'in-review';
         else if (t.status === 'done') frontendStatus = 'done';
         
-        let assignee = { name: 'Unassigned', initials: '?', color: '#9CA3AF' };
+        let assignee = { name: 'Unassigned', initials: '?', color: '#9CA3AF', clerkId: t.assignee || undefined };
         if (t.assigneeInfo) {
           assignee = {
             name: t.assigneeInfo.name,
             initials: getInitials(t.assigneeInfo.name),
-            color: getAvatarColor(t.assigneeInfo.clerkId)
+            color: getAvatarColor(t.assigneeInfo.clerkId),
+            clerkId: t.assigneeInfo.clerkId
           };
         }
 
@@ -253,9 +334,11 @@ export const api = {
           id: t._id,
           title: t.title,
           status: frontendStatus,
-          priority: 'medium',
+          priority: t.priority || 'medium',
           due: t.dueDate ? format(new Date(t.dueDate), 'MMM d') : 'No due date',
-          assignee
+          assignee,
+          description: t.description || '',
+          dueDate: t.dueDate || null
         };
       });
     } catch (err) {
@@ -286,7 +369,7 @@ export const api = {
     }
   },
   
-  addTask: async (teamId: string, token: string, task: { title: string; assignee?: string | null; dueDate?: string | null }): Promise<void> => {
+  addTask: async (teamId: string, token: string, task: { title: string; assignee?: string | null; dueDate?: string | null; priority?: 'low' | 'medium' | 'high' }): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE_URL}/teams/${teamId}/tasks`, {
         method: 'POST',
@@ -303,10 +386,36 @@ export const api = {
         id: `mock-t-${Date.now()}`,
         title: task.title,
         status: 'backlog',
-        priority: 'medium',
+        priority: task.priority || 'medium',
         due: task.dueDate ? format(new Date(task.dueDate), 'MMM d') : 'No due date',
         assignee: { name: task.assignee || 'Unassigned', initials: '?', color: '#9CA3AF' }
       });
     }
+  },
+
+  updateTask: async (id: string, token: string, updates: { title?: string; description?: string; assignee?: string | null; dueDate?: string | null; priority?: string }): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      if (!res.ok) throw new Error('Failed to update task');
+    } catch (err) {
+      console.warn('Failed to update real task', err);
+    }
+  },
+
+  deleteTask: async (id: string, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!res.ok) throw new Error('Failed to delete task');
   }
 };

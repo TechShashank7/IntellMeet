@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { useTeamStore } from '../store/store';
 import { format } from 'date-fns';
@@ -16,7 +16,9 @@ import {
   Sparkles,
   Download,
   MessageCircle,
-  ArrowRight
+  ArrowRight,
+  Star,
+  X
 } from 'lucide-react';
 
 export default function AISummary() {
@@ -24,8 +26,13 @@ export default function AISummary() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
+  const { user } = useUser();
   const { currentTeamId } = useTeamStore();
   const [syncedItems, setSyncedItems] = useState<Set<string>>(new Set());
+  
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [hasViewedInsights, setHasViewedInsights] = useState(false);
+  const [hoveredStar, setHoveredStar] = useState<number | null>(null);
 
   const { data: meeting, isLoading: loadingMeeting } = useQuery({
     queryKey: ['meeting', id],
@@ -51,6 +58,17 @@ export default function AISummary() {
     }
   });
 
+  const alreadyRated = meeting?.ratings?.some((r: any) => r.clerkId === user?.id);
+
+  const { mutate: rateCall } = useMutation({
+    mutationFn: async (payload: { rating?: number; skipped?: boolean }) =>
+      api.rateMeeting(id || '', await getToken() || '', payload),
+    onSettled: () => {
+      setRatingSubmitted(true);
+      queryClient.invalidateQueries({ queryKey: ['meeting', id] });
+    }
+  });
+
   const handleSyncToTasks = (item: any) => {
     if (syncedItems.has(item.id) || !meeting) return;
     
@@ -67,6 +85,7 @@ export default function AISummary() {
     const attendee = meeting?.attendees?.find(a => a.clerkId === item.assignee);
     return {
       ...item,
+      id: item._id || item.id,
       assignee: attendee || { name: 'Unassigned', initials: '?', color: '#9CA3AF' }
     };
   }) || [];
@@ -89,6 +108,62 @@ export default function AISummary() {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans">
         <div className="text-[#EF4444]">Meeting not found.</div>
+      </div>
+    );
+  }
+
+  if (!alreadyRated && !ratingSubmitted) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans">
+        <div className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative max-w-sm w-full text-center">
+          <button 
+            onClick={() => rateCall({ skipped: true })}
+            className="absolute top-4 right-4 text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
+          >
+            <X size={20} />
+          </button>
+          <h2 className="text-[20px] font-semibold text-[#111827] mb-2">How was your call?</h2>
+          <p className="text-[14px] text-[#6B7280] mb-8">Rate your meeting experience</p>
+          <div className="flex items-center justify-center gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onMouseEnter={() => setHoveredStar(star)}
+                onMouseLeave={() => setHoveredStar(null)}
+                onClick={() => rateCall({ rating: star })}
+                className={`p-1 transition-colors ${
+                  (hoveredStar !== null ? star <= hoveredStar : false) 
+                    ? 'text-[#4F46E5]' 
+                    : 'text-[#9CA3AF]'
+                }`}
+              >
+                <Star 
+                  size={36} 
+                  className={(hoveredStar !== null ? star <= hoveredStar : false) ? 'fill-[#4F46E5]' : ''} 
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ratingSubmitted && !hasViewedInsights) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans relative">
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-8 left-8 p-3 text-[#6B7280] hover:text-[#111827] hover:bg-white rounded-full transition-colors flex items-center gap-2 shadow-sm border border-transparent hover:border-[#E5E7EB]"
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <button 
+          onClick={() => setHasViewedInsights(true)}
+          className="px-6 py-3 bg-[#4F46E5] text-white rounded-md font-medium shadow-sm hover:bg-[#4338CA] transition-colors"
+        >
+          Check the insights of this meeting
+        </button>
       </div>
     );
   }

@@ -172,7 +172,7 @@ export default function AISummary() {
     <div className="min-h-screen bg-[#FAFAFA] font-sans">
       {/* Header */}
       <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-10 px-8 py-4">
-        <div className="max-w-[1000px] mx-auto flex items-center justify-between">
+        <div className="max-w-none w-full px-2 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate('/dashboard')}
@@ -202,7 +202,7 @@ export default function AISummary() {
         </div>
       </header>
 
-      <div className="max-w-[1000px] mx-auto py-8 px-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-[1400px] mx-auto w-full py-8 px-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           

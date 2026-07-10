@@ -12,7 +12,6 @@ import {
   FileText,
   Video,
   LogIn,
-  MonitorUp,
   Sparkles,
   X,
   Search,

@@ -1089,7 +1089,7 @@ export default function Dashboard() {
         </div>
 
         {/* Section 3 — Core Action Launcher (Compact Zoom-style) */}
-        <div className="flex justify-evenly mt-[44px] w-full">
+        <div className="flex justify-center gap-[80px] mt-[44px] w-full">
           {/* Action 1 */}
           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={handleNewMeeting}>
             <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
@@ -1110,13 +1110,6 @@ export default function Dashboard() {
               <Calendar size={24} className="text-[#4F46E5]" />
             </button>
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">Schedule</span>
-          </div>
-          {/* Action 4 */}
-          <div className="flex flex-col items-center gap-2 cursor-pointer group text-center">
-            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
-              <MonitorUp size={24} className="text-[#4F46E5]" />
-            </button>
-            <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors leading-tight">Share Screen</span>
           </div>
         </div>
 
@@ -1192,14 +1185,13 @@ export default function Dashboard() {
           <div className="w-[42%] flex flex-col">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <h2 className="text-[16px] font-[600] text-[#111827]">Recent AI Summaries</h2>
-              <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View All &rarr;</button>
             </div>
             <div className="flex flex-col gap-[12px] flex-1">
               {isLoadingRecent ? (
                 <div className="text-[#6B7280] text-[14px]">Loading recent meetings...</div>
               ) : recentMeetings.length === 0 ? (
                 <div className="text-[#6B7280] text-[14px]">No recent meetings</div>
-              ) : recentMeetings.map((summary: any) => {
+              ) : recentMeetings.slice(0, 3).map((summary: any) => {
                 const meetingDate = new Date(summary.startTime || summary.date);
                 let dateLabel = format(meetingDate, 'MMM d');
                 if (isToday(meetingDate)) dateLabel = 'Today';
@@ -1245,6 +1237,13 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            {recentMeetings.length > 0 && (
+              <div className="mt-4 text-center">
+                <button onClick={() => navigate('/dashboard?tab=meetings')} className="text-[#4F46E5] text-[13px] font-[400] hover:underline">
+                  View All &rarr;
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

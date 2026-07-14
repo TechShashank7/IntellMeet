@@ -80,7 +80,10 @@ export const handleStreamVideoWebhook = async (req, res) => {
         }
       }).filter(Boolean);
 
-      const plainTextTranscript = transcriptParts.join('\n');
+      let plainTextTranscript = transcriptParts.join('\n');
+      if (plainTextTranscript.trim().length === 0) {
+        plainTextTranscript = "No speech was detected during this meeting. It was likely a silent or very brief session.";
+      }
       session.transcript = plainTextTranscript;
       session.transcriptSegments = transcriptSegments;
       await session.save();

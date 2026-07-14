@@ -393,7 +393,9 @@ export const api = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 1000);
   },
 
   downloadMeetingSummaryPdf: async (id: string, token: string, filename: string): Promise<void> => {
@@ -409,7 +411,9 @@ export const api = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 1000);
   },
 
   shareMeetingToSlack: async (id: string, token: string): Promise<any> => {

@@ -1202,7 +1202,7 @@ export async function shareMeetingToSlack(req, res) {
     res.status(200).json(result);
   } catch (error) {
     console.error("Error in shareMeetingToSlack:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 }
 
@@ -1242,6 +1242,6 @@ export async function syncMeetingToNotion(req, res) {
     res.status(200).json(result);
   } catch (error) {
     console.error("Error in syncMeetingToNotion:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 }

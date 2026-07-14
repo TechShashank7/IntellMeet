@@ -143,6 +143,9 @@ const getSessionSummary = asyncHandler(async (req, res) => {
 
                 session.transcript = transcriptParts.join('\n');
                 session.transcriptSegments = transcriptSegments;
+                if (session.transcript.trim().length === 0) {
+                  session.transcript = "No speech was detected during this meeting. It was likely a silent or very brief session.";
+                }
                 await session.save();
               }
             }

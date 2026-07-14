@@ -432,13 +432,13 @@ export default function AISummary() {
                     {postingToSlack ? 'Posting...' : slackMessage?.type === 'success' ? slackMessage.text : 'Post to Slack'}
                   </span>
                 </div>
-                {slackMessage?.type === 'error' && (
-                  <span className="text-xs text-red-500 max-w-[100px] truncate" title={slackMessage.text}>{slackMessage.text}</span>
-                )}
                 {(!slackMessage || slackMessage.type === 'success') && (
                   <ArrowRight size={16} className="text-[#9CA3AF]" />
                 )}
               </button>
+              {slackMessage?.type === 'error' && (
+                <div className="text-xs text-red-500 mt-1 pl-1">{slackMessage.text}</div>
+              )}
               <button 
                 onClick={handleSyncToNotion}
                 disabled={syncingToNotion}
@@ -452,13 +452,13 @@ export default function AISummary() {
                     {syncingToNotion ? 'Syncing...' : notionMessage?.type === 'success' ? notionMessage.text : 'Sync to Notion'}
                   </span>
                 </div>
-                {notionMessage?.type === 'error' && (
-                  <span className="text-xs text-red-500 max-w-[100px] truncate" title={notionMessage.text}>{notionMessage.text}</span>
-                )}
                 {(!notionMessage || notionMessage.type === 'success') && (
                   <ArrowRight size={16} className="text-[#9CA3AF]" />
                 )}
               </button>
+              {notionMessage?.type === 'error' && (
+                <div className="text-xs text-red-500 mt-1 pl-1">{notionMessage.text}</div>
+              )}
               {notionMessage?.url && (
                 <a href={notionMessage.url} target="_blank" rel="noreferrer" className="block text-xs text-right text-[#4F46E5] hover:underline mt-1 mr-2">
                   View Page in Notion

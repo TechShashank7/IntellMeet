@@ -1157,9 +1157,14 @@ export async function exportMeetingNotes(req, res) {
       }
     }
 
-    doc.end();
+    // Wait for the stream to finish before ending the Vercel function
+    await new Promise((resolve, reject) => {
+      res.on('finish', resolve);
+      res.on('error', reject);
+      doc.end();
+    });
   } catch (error) {
-    console.log("Error in exportMeetingNotes controller:", error.message);
+    console.error("Error in exportMeetingNotes controller:", error.message);
     if (!res.headersSent) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -1184,7 +1189,7 @@ export async function shareMeetingToSlack(req, res) {
     if (!team) return res.status(404).json({ message: "Team not found" });
 
     if (!team.slackWebhookUrl) {
-      return res.status(400).json({ message: "Slack webhook URL is not configured for this team" });
+      return res.status(400).json({ message: "Please do slack integration on Teams section first" });
     }
 
     const resolvedParticipants = await resolveParticipants(session.participants);
@@ -1224,7 +1229,7 @@ export async function syncMeetingToNotion(req, res) {
     if (!team) return res.status(404).json({ message: "Team not found" });
 
     if (!team.notionToken || !team.notionPageId) {
-      return res.status(400).json({ message: "Notion integration is not fully configured for this team" });
+      return res.status(400).json({ message: "Please do notion integration on Teams section first" });
     }
 
     const resolvedParticipants = await resolveParticipants(session.participants);

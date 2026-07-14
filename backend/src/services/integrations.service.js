@@ -1,6 +1,6 @@
 export async function postMeetingToSlack(session, team) {
   if (!team.slackWebhookUrl) {
-    throw new Error("Slack webhook URL is not configured for this team");
+    throw new Error("Please do slack integration on Teams section first");
   }
 
   const formatTime = (date) => {
@@ -75,7 +75,7 @@ export async function postMeetingToSlack(session, team) {
 
 export async function syncMeetingToNotion(session, team) {
   if (!team.notionToken || !team.notionPageId) {
-    throw new Error("Notion integration is not fully configured for this team");
+    throw new Error("Please do notion integration on Teams section first");
   }
 
   const formatTime = (date) => {

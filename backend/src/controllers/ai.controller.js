@@ -47,8 +47,8 @@ const summarizeMeeting = asyncHandler(async (req, res) => {
       actionItems.map((item) => ({
         meetingId: session._id,
         text: item.text,
-        assignee: item.assignee || null,
-        dueDate: item.dueDate || null,
+        assignee: item.assignee === "null" || item.assignee === "N/A" || item.assignee === "None" ? null : (item.assignee || null),
+        dueDate: (item.dueDate && !isNaN(Date.parse(item.dueDate))) ? item.dueDate : null,
         sourceConfidence: item.confidence || "medium",
       }))
     );
@@ -84,18 +84,19 @@ const getSessionSummary = asyncHandler(async (req, res) => {
     throw new Error("Session not found");
   }
 
-  // Fallback: If pending, or stuck in processing without a transcript (from a previous timeout)
-  if ((session.aiProcessingStatus === "pending" || (session.aiProcessingStatus === "processing" && !session.transcript)) && session.status === "completed") {
+  const isStuckProcessing = session.aiProcessingStatus === "processing" && 
+    (Date.now() - new Date(session.updatedAt).getTime() > 20000);
+
+  // Fallback: If pending, or stuck in processing from a previous timeout
+  if ((session.aiProcessingStatus === "pending" || isStuckProcessing) && session.status === "completed") {
     // Try to get a lock atomically (only if pending, if already processing we just continue but the lock won't trigger if multiple hit this branch at once)
     let lockedSession;
-    if (session.aiProcessingStatus === "pending") {
+    if (session.aiProcessingStatus === "pending" || isStuckProcessing) {
       lockedSession = await Session.findOneAndUpdate(
-        { _id: session._id, aiProcessingStatus: "pending" },
+        { _id: session._id, $or: [{ aiProcessingStatus: "pending" }, { aiProcessingStatus: "processing" }] },
         { $set: { aiProcessingStatus: "processing" } },
         { new: true }
       );
-    } else {
-      lockedSession = session; // Already processing but stuck, let's take over
     }
 
     if (lockedSession) {

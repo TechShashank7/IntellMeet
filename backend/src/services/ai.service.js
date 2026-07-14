@@ -103,8 +103,8 @@ const summarizeAndPersist = async (meetingId) => {
     actionItems.map((item) => ({
       meetingId: meeting._id,
       text: item.text,
-      assignee: item.assignee || null,
-      dueDate: item.dueDate || null,
+      assignee: item.assignee === "null" || item.assignee === "N/A" || item.assignee === "None" ? null : (item.assignee || null),
+      dueDate: (item.dueDate && !isNaN(Date.parse(item.dueDate))) ? item.dueDate : null,
       sourceConfidence: item.confidence || "medium",
     }))
   );

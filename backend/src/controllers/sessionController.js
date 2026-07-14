@@ -1039,7 +1039,9 @@ export async function exportMeetingNotes(req, res) {
     const { id } = req.params;
     const { type } = req.query;
     let query = { callId: id };
-    if (id && id.length === 24) {
+    if (id && id.length === 6 && /^\d+$/.test(id)) {
+      query = { joinCode: id };
+    } else if (id && id.length === 24) {
       query = { $or: [{ _id: id }, { callId: id }] };
     }
     const session = await Session.findOne(query)
@@ -1179,7 +1181,9 @@ export async function shareMeetingToSlack(req, res) {
   try {
     const { id } = req.params;
     let query = { callId: id };
-    if (id && id.length === 24) {
+    if (id && id.length === 6 && /^\d+$/.test(id)) {
+      query = { joinCode: id };
+    } else if (id && id.length === 24) {
       query = { $or: [{ _id: id }, { callId: id }] };
     }
     const session = await Session.findOne(query).populate("actionItems").lean();
@@ -1223,7 +1227,9 @@ export async function syncMeetingToNotion(req, res) {
   try {
     const { id } = req.params;
     let query = { callId: id };
-    if (id && id.length === 24) {
+    if (id && id.length === 6 && /^\d+$/.test(id)) {
+      query = { joinCode: id };
+    } else if (id && id.length === 24) {
       query = { $or: [{ _id: id }, { callId: id }] };
     }
     const session = await Session.findOne(query).populate("actionItems").lean();

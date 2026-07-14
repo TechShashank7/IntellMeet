@@ -55,7 +55,6 @@ export default function AISummary() {
       await api.downloadMeetingSummaryPdf(id, token, safeTitle);
     } catch (err: any) {
       console.error('Failed to download PDF:', err);
-      window.alert(err.message || 'Failed to download PDF');
     } finally {
       setDownloading(false);
     }

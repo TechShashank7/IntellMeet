@@ -5,6 +5,7 @@ import {
   getTeamTasks,
   updateTask,
   deleteTask,
+  addTaskComment,
 } from "../controllers/task.controller.js";
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.get("/teams/:teamId/tasks", getTeamTasks);
 // Flat task operations: /api/tasks/:id
 router.patch("/tasks/:id", updateTask); // update status, assignee, dueDate, etc.
 router.delete("/tasks/:id", deleteTask);
+router.post("/tasks/:id/comments", addTaskComment);
 
 export default router;

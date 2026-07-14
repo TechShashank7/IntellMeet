@@ -21,6 +21,16 @@ export function getAvatarColor(seed: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+export function formatDurationSeconds(totalSeconds: number): string {
+  const minutes = Math.round(totalSeconds / 60);
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 export function formatMeetingDuration(startTime: string, endTime?: string, estimatedDuration: number = 30): string {
   let diffMinutes = estimatedDuration;
   if (endTime) {
@@ -44,4 +54,15 @@ export function formatElapsedTime(totalSeconds: number): string {
   const seconds = totalSeconds % 60;
   const pad = (n: number) => n.toString().padStart(2, '0');
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+}
+
+export function formatCountdown(msRemaining: number): string {
+  const totalSeconds = Math.max(0, Math.floor(msRemaining / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }

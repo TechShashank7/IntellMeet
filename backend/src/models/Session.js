@@ -21,6 +21,23 @@ const meetingSchema = new mongoose.Schema(
         type: String, // clerkIds
       },
     ],
+    waitingRoom: [
+      {
+        clerkId: { type: String, required: true },
+        name: { type: String, default: '' },
+        profileImage: { type: String, default: '' },
+        requestedAt: { type: Date, default: Date.now },
+      }
+    ],
+    deniedClerkIds: [
+      {
+        type: String,
+      }
+    ],
+    openForAll: {
+      type: Boolean,
+      default: false,
+    },
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
@@ -34,6 +51,14 @@ const meetingSchema = new mongoose.Schema(
     startTime: { type: Date, required: true },
     endTime: { type: Date },
     duration: { type: Number, default: 0 },
+    hasRecording: {
+      type: Boolean,
+      default: false,
+    },
+    recordingDurationSeconds: {
+      type: Number,
+      default: 0,
+    },
     // stream video call ID
     callId: {
       type: String,
@@ -43,6 +68,17 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    transcriptionStartedAt: {
+      type: Date,
+      default: null,
+    },
+    transcriptSegments: [
+      {
+        speakerId: { type: String, default: null },
+        text: { type: String, required: true },
+        timestamp: { type: Date, default: null },
+      }
+    ],
     estimatedDuration: { 
       type: Number, 
       default: 30 

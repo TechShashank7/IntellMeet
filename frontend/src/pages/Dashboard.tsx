@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { formatMeetingDuration, getInitials, getAvatarColor } from '../lib/utils';
+import { getInitials, getAvatarColor, formatDurationSeconds } from '../lib/utils';
 import { useTeamStore } from '../store/store';
 import { 
   Plus, 
@@ -23,7 +23,10 @@ import {
   Trash2,
   Loader2,
   Check,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  ChevronRight,
+  Download, Users, TrendingUp
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -54,6 +57,7 @@ export default function Dashboard() {
   const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  const [isOpenForAll, setIsOpenForAll] = useState(false);
   const [isNewMeetingModalOpen, setIsNewMeetingModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [meetingTopic, setMeetingTopic] = useState('');
@@ -61,10 +65,59 @@ export default function Dashboard() {
   const [isCreating, setIsCreating] = useState(false);
   const [meetingSearchQuery, setMeetingSearchQuery] = useState('');
   
+  const [scheduleOpenForAll, setScheduleOpenForAll] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [deleteMeetingId, setDeleteMeetingId] = useState<string | null>(null);
+  const [leaveMeetingId, setLeaveMeetingId] = useState<string | null>(null);
+  
+  const [activeMeetingManageId, setActiveMeetingManageId] = useState<string | null>(null);
+  const [manageSelectedTeamId, setManageSelectedTeamId] = useState<string | null>(null);
+  const [isManageTeamDropdownOpen, setIsManageTeamDropdownOpen] = useState(false);
+  const [manageSearchQuery, setManageSearchQuery] = useState('');
+  const [newParticipants, setNewParticipants] = useState<string[]>([]);
+  const [removeConfirmParticipant, setRemoveConfirmParticipant] = useState<{ meetingId: string; clerkId: string; name: string } | null>(null);
+
+  const [scheduleTitle, setScheduleTitle] = useState('');
+  const [scheduleDateTime, setScheduleDateTime] = useState('');
+  const [scheduleParticipants, setScheduleParticipants] = useState<{clerkId: string; name: string}[]>([]);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleSelectedTeamId, setScheduleSelectedTeamId] = useState<string | null>(null);
+  const [isScheduleTeamDropdownOpen, setIsScheduleTeamDropdownOpen] = useState(false);
+  const [scheduleSearchQuery, setScheduleSearchQuery] = useState('');
+  const [scheduleSuccessMessage, setScheduleSuccessMessage] = useState<string | null>(null);
+  const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+
+  const handleCopyInvitation = (meeting: any) => {
+    const timeStr = format(new Date(meeting.startTime), "MMM d, yyyy h:mm a");
+    const joinUrl = `${window.location.origin}/meeting/${meeting.joinCode || meeting.id}`;
+    const message = `${user?.fullName || user?.firstName || 'Someone'} is inviting you to a scheduled IntellMeet meeting.\nTopic: ${meeting.title}\nTime: ${timeStr}\nJoin Meeting: ${joinUrl}`;
+    navigator.clipboard.writeText(message);
+    setCopiedMeetingId(meeting.id);
+    setTimeout(() => setCopiedMeetingId((prev) => (prev === meeting.id ? null : prev)), 2000);
+  };
+
+  const canJoinNow = (meeting: any) => {
+    if (!user?.id) return false;
+    const isMeetingHost = meeting.hostClerkId === user.id;
+    if (isMeetingHost) return true;
+    if (meeting.status === 'active') return true;
+    if (meeting.status === 'scheduled' && meeting.startTime) {
+      return new Date() >= new Date(meeting.startTime);
+    }
+    return meeting.status !== 'scheduled';
+  };
+  
   const queryClient = useQueryClient();
   const { teams, currentTeamId, setTeams, setCurrentTeamId } = useTeamStore();
+  const currentTeam = teams.find((t) => t._id === currentTeamId);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState<{ success: boolean; text: string } | null>(null);
+
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
+  const [notionToken, setNotionToken] = useState('');
+  const [notionPageId, setNotionPageId] = useState('');
+  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+  const [integrationMessage, setIntegrationMessage] = useState<{ success: boolean; text: string } | null>(null);
   const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
@@ -73,10 +126,49 @@ export default function Dashboard() {
   const [kickConfirm, setKickConfirm] = useState<{ teamId: string; clerkId: string; memberName: string; teamName: string } | null>(null);
   const [isLeavingOrKicking, setIsLeavingOrKicking] = useState(false);
 
+  const removeConfirmRef = useRef<HTMLDivElement>(null);
+  const manageParticipantsRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      
+      const isInsideConfirm = removeConfirmRef.current?.contains(target);
+      const isInsideManage = manageParticipantsRef.current?.contains(target);
+      const isManageBtn = (target as Element).closest?.('.manage-participants-btn');
+
+      if (removeConfirmParticipant && !isInsideConfirm) {
+        setRemoveConfirmParticipant(null);
+      }
+
+      if (activeMeetingManageId && !isInsideManage && !isInsideConfirm && !isManageBtn) {
+        setActiveMeetingManageId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [removeConfirmParticipant, activeMeetingManageId]);
+
   const { data: teamMembers = [], isLoading: isLoadingMembers } = useQuery({
     queryKey: ['teamMembers', currentTeamId],
     queryFn: async () => api.getTeamMembers(currentTeamId || '', await getToken() || ''),
     enabled: !!currentTeamId && tab === 'team'
+  });
+
+  const { data: scheduleTeamMembers = [], isLoading: isLoadingScheduleMembers } = useQuery({
+    queryKey: ['scheduleTeamMembers', scheduleSelectedTeamId],
+    queryFn: async () => api.getTeamMembers(scheduleSelectedTeamId || '', await getToken() || ''),
+    enabled: !!scheduleSelectedTeamId && isScheduleModalOpen
+  });
+
+  const { data: manageTeamMembers = [], isLoading: isLoadingManageMembers } = useQuery({
+    queryKey: ['manageTeamMembers', manageSelectedTeamId],
+    queryFn: async () => api.getTeamMembers(manageSelectedTeamId || '', await getToken() || ''),
+    enabled: !!manageSelectedTeamId && !!activeMeetingManageId
   });
 
   const { mutate: inviteMember, isPending: isInviting } = useMutation({
@@ -94,6 +186,37 @@ export default function Dashboard() {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     inviteMember(inviteEmail.trim());
+  };
+
+  useEffect(() => {
+    if (currentTeam) {
+      setSlackWebhookUrl(currentTeam.slackWebhookUrl || '');
+      setNotionToken(currentTeam.notionToken || '');
+      setNotionPageId(currentTeam.notionPageId || '');
+    }
+  }, [currentTeam]);
+
+  const handleSaveIntegrations = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentTeamId) return;
+    try {
+      setIsSavingIntegrations(true);
+      const token = await getToken();
+      if (!token) return;
+      const updatedTeam = await api.updateTeamIntegrations(currentTeamId, token, {
+        slackWebhookUrl,
+        notionToken,
+        notionPageId
+      });
+      // update team in store
+      setTeams(teams.map(t => t._id === currentTeamId ? updatedTeam : t));
+      setIntegrationMessage({ success: true, text: 'Integrations saved successfully' });
+      setTimeout(() => setIntegrationMessage(null), 3000);
+    } catch (err: any) {
+      setIntegrationMessage({ success: false, text: err.message || 'Failed to save integrations' });
+    } finally {
+      setIsSavingIntegrations(false);
+    }
   };
 
   const handleCreateTeamSubmit = async (e: React.FormEvent) => {
@@ -175,8 +298,8 @@ export default function Dashboard() {
   });
 
   const { data: analytics, isLoading: isLoadingAnalytics } = useQuery({
-    queryKey: ['meetingAnalytics'],
-    queryFn: async () => api.getMeetingAnalytics(await getToken() || ''),
+    queryKey: ['meetingAnalytics', currentTeamId],
+    queryFn: async () => api.getMeetingAnalytics(await getToken() || '', currentTeamId || undefined),
     enabled: tab === 'analytics'
   });
 
@@ -184,6 +307,12 @@ export default function Dashboard() {
     queryKey: ['tasks', currentTeamId],
     queryFn: async () => api.getTasks(currentTeamId || '', await getToken() || ''),
     enabled: !!currentTeamId
+  });
+
+  const { data: recordingsList = [], isLoading: isLoadingRecordings } = useQuery({
+    queryKey: ['recordingsList'],
+    queryFn: async () => api.getRecordingsList(await getToken() || ''),
+    enabled: tab === 'recordings'
   });
 
   const { data: userSessions, isLoading: isLoadingSessions } = useQuery({
@@ -208,8 +337,58 @@ export default function Dashboard() {
 
   const handleNewMeeting = () => {
     setMeetingTopic('');
+    setIsOpenForAll(false);
     setIsNewMeetingModalOpen(true);
   };
+
+  const { mutate: deleteMeeting, isPending: isDeletingMeeting } = useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.deleteMeeting(id, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingMeetings'] });
+      setDeleteMeetingId(null);
+    }
+  });
+
+  const { mutate: leaveMeeting, isPending: isLeavingMeeting } = useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.leaveMeeting(id, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingMeetings'] });
+      setLeaveMeetingId(null);
+    }
+  });
+
+  const { mutate: inviteToMeeting, isPending: isInvitingToMeeting } = useMutation({
+    mutationFn: async ({ id, participantClerkIds }: { id: string; participantClerkIds: string[] }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.inviteToMeeting(id, participantClerkIds, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingMeetings'] });
+      setNewParticipants([]);
+      setActiveMeetingManageId(null);
+    }
+  });
+
+  const { mutate: removeMeetingParticipant, isPending: isRemovingParticipant } = useMutation({
+    mutationFn: async ({ id, participantClerkId }: { id: string; participantClerkId: string }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.removeMeetingParticipant(id, participantClerkId, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingMeetings'] });
+      setRemoveConfirmParticipant(null);
+    }
+  });
 
   const submitNewMeeting = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -218,14 +397,54 @@ export default function Dashboard() {
       setIsCreating(true);
       const token = await getToken();
       if (!token) return;
-      const session = await api.createMeeting(token, meetingTopic);
+      const session = await api.createMeeting(token, meetingTopic, { openForAll: isOpenForAll, teamId: currentTeamId || undefined });
       setIsNewMeetingModalOpen(false);
-      navigate(`/meeting/${session.joinCode || session._id}`);
+      window.open(`/meeting/${session.joinCode || session._id}`, '_blank');
     } catch (error) {
       console.error('Error creating meeting:', error);
       window.alert('Failed to create meeting, please try again.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const submitScheduleMeeting = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!scheduleTitle.trim() || !scheduleDateTime) return;
+    try {
+      setIsScheduling(true);
+      const token = await getToken();
+      if (!token) return;
+      await api.createMeeting(token, scheduleTitle, {
+        scheduledFor: new Date(scheduleDateTime).toISOString(),
+        participantClerkIds: scheduleParticipants.map(p => p.clerkId),
+        openForAll: scheduleOpenForAll,
+        teamId: scheduleSelectedTeamId || undefined
+      });
+      queryClient.invalidateQueries({ queryKey: ['upcomingMeetings'] });
+
+      if (scheduleParticipants.length > 0) {
+        const invitedNames = scheduleParticipants.map(p => p.name);
+        setScheduleSuccessMessage(`Successfully invited ${invitedNames.join(', ')}.`);
+      } else {
+        setScheduleSuccessMessage('Meeting scheduled successfully.');
+      }
+
+      setScheduleTitle('');
+      setScheduleDateTime('');
+      setScheduleParticipants([]);
+      setScheduleOpenForAll(false);
+
+      setTimeout(() => {
+        setIsScheduleModalOpen(false);
+        setScheduleSuccessMessage(null);
+        setScheduleSearchQuery('');
+      }, 2200);
+    } catch (error) {
+      console.error('Error scheduling meeting:', error);
+      window.alert('Failed to schedule meeting, please try again.');
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -238,11 +457,11 @@ export default function Dashboard() {
     if (e) e.preventDefault();
     if (!joinMeetingId.trim()) return;
     setIsJoinModalOpen(false);
-    navigate(`/meeting/${joinMeetingId.trim()}`);
+    window.open(`/meeting/${joinMeetingId.trim()}`, '_blank');
   };
 
   const handleJoinMeeting = (id: string) => {
-    navigate(`/meeting/${id}`);
+    window.open(`/meeting/${id}`, '_blank');
   };
 
   const handleViewSummary = (id: string) => {
@@ -341,7 +560,6 @@ export default function Dashboard() {
   if (tab === 'team') {
     const currentUserMember = teamMembers.find((m: any) => m.clerkId === user?.id);
     const isCurrentUserAdmin = currentUserMember?.isAdmin;
-    const currentTeam = teams.find((t) => t._id === currentTeamId);
 
     return (
       <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
@@ -482,6 +700,61 @@ export default function Dashboard() {
                   </form>
                 </div>
               )}
+
+              {isCurrentUserAdmin && (
+                <div className="mt-8 pt-6 border-t border-[#E5E7EB]">
+                  <h3 className="text-[15px] font-[600] text-[#111827] mb-4">Integrations</h3>
+                  <form onSubmit={handleSaveIntegrations} className="flex flex-col gap-4 max-w-md">
+                    <div>
+                      <label className="block text-[13px] font-[500] text-[#374151] mb-1">Slack Webhook URL</label>
+                      <input
+                        type="url"
+                        value={slackWebhookUrl}
+                        onChange={(e) => setSlackWebhookUrl(e.target.value)}
+                        placeholder="https://hooks.slack.com/services/..."
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                        disabled={isSavingIntegrations}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-[500] text-[#374151] mb-1">Notion Token</label>
+                      <input
+                        type="password"
+                        value={notionToken}
+                        onChange={(e) => setNotionToken(e.target.value)}
+                        placeholder="secret_..."
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                        disabled={isSavingIntegrations}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-[500] text-[#374151] mb-1">Notion Page ID</label>
+                      <input
+                        type="text"
+                        value={notionPageId}
+                        onChange={(e) => setNotionPageId(e.target.value)}
+                        placeholder="e.g. 1234567890abcdef..."
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                        disabled={isSavingIntegrations}
+                      />
+                    </div>
+                    <div>
+                      <button
+                        type="submit"
+                        disabled={isSavingIntegrations}
+                        className="px-4 py-2 bg-[#4F46E5] text-white rounded-md text-[13px] font-medium hover:bg-[#4338CA] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isSavingIntegrations ? 'Saving...' : 'Save Integrations'}
+                      </button>
+                    </div>
+                    {integrationMessage && (
+                      <div className={`text-[13px] p-2 rounded-md ${integrationMessage.success ? 'bg-[#ECFDF5] text-[#059669]' : 'bg-[#FEF2F2] text-[#DC2626]'}`}>
+                        {integrationMessage.text}
+                      </div>
+                    )}
+                  </form>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -587,31 +860,281 @@ export default function Dashboard() {
           <div className="space-y-8">
             <div>
               <h3 className="text-[15px] font-[600] text-[#111827] mb-3">Upcoming ({filteredUpcoming.length})</h3>
-              <div className="bg-white border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="bg-white border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] flex flex-col">
                 {filteredUpcoming.length === 0 ? (
                   <div className="p-5 text-[#6B7280] text-[14px]">No upcoming meetings found.</div>
                 ) : filteredUpcoming.map((meeting: any, index: number) => {
                   const meetingDate = new Date(meeting.startTime || meeting.date);
-                  const timeStr = format(meetingDate, 'MMM d, h:mm a');
-                  const durationStr = formatMeetingDuration(meeting.startTime || meeting.date, meeting.endTime, meeting.estimatedDuration);
+                  const isMeetingToday = isToday(meetingDate);
+                  const timeStr = format(meetingDate, 'd MMMM yyyy h:mm a');
+                  const isMeetingHost = meeting.hostClerkId === user?.id;
+                  
                   return (
-                    <div
-                      key={meeting.id}
-                      className={`p-5 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors ${index !== filteredUpcoming.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                    <div 
+                      key={meeting.id} 
+                      className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== filteredUpcoming.length - 1 ? 'border-b border-[#F3F4F6]' : ''} ${index === 0 ? 'rounded-t-[12px]' : ''} ${index === filteredUpcoming.length - 1 ? 'rounded-b-[12px]' : ''}`}
                     >
-                      <div>
+                      {/* Left Border indicator */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${index === 0 ? 'rounded-tl-[12px]' : ''} ${index === filteredUpcoming.length - 1 ? 'rounded-bl-[12px]' : ''} ${isMeetingToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
+                      
+                      <div className="flex-1 pl-2">
                         <h4 className="text-[15px] font-[600] text-[#111827] mb-1">{meeting.title}</h4>
-                        <div className="flex items-center text-[13px] text-[#6B7280] gap-1.5">
+                        <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-1.5">
                           <Calendar size={13} />
-                          <span>{timeStr} • {durationStr}</span>
+                          <span>{timeStr}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleJoinMeeting(meeting.id)}
-                        className="h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all"
-                      >
-                        Join
-                      </button>
+                      
+                      <div className="flex items-center gap-4">
+                        {/* Avatars */}
+                        <div className="flex -space-x-[8px]">
+                          {meeting.attendees?.map((attendee: any, i: number) => (
+                            attendee.profileImage ? (
+                              <img 
+                                key={i}
+                                src={attendee.profileImage} 
+                                alt={attendee.name}
+                                title={attendee.name}
+                                className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] object-cover shadow-sm"
+                              />
+                            ) : (
+                              <div 
+                                key={i} 
+                                className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
+                                style={{ background: attendee.color || getAvatarColor(attendee.clerkId) }}
+                                title={attendee.name}
+                              >
+                                {attendee.initials || getInitials(attendee.name)}
+                              </div>
+                            )
+                          ))}
+                        </div>
+                        
+                        {isMeetingHost && (
+                          <button
+                            onClick={() => {
+                              if (activeMeetingManageId === meeting.id) {
+                                setActiveMeetingManageId(null);
+                              } else {
+                                setActiveMeetingManageId(meeting.id);
+                                setManageSelectedTeamId(currentTeamId);
+                                setManageSearchQuery('');
+                                setNewParticipants([]);
+                              }
+                            }}
+                            className="manage-participants-btn w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] bg-[#E5E7EB] hover:bg-[#D1D5DB] flex items-center justify-center text-[#4B5563] ml-1 z-10 transition-colors"
+                            title="Manage Participants"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        )}
+
+                        {isMeetingHost ? (
+                          <div className="flex items-center gap-2 ml-1">
+                            <button
+                              onClick={() => handleJoinMeeting(meeting.id)}
+                              className="h-[32px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[6px] text-[13px] font-[500] transition-colors"
+                            >
+                              Start
+                            </button>
+                            <button
+                              onClick={() => handleCopyInvitation(meeting)}
+                              className="h-[32px] px-3 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-[6px] text-[13px] font-[500] transition-colors flex items-center gap-1.5"
+                            >
+                              {copiedMeetingId === meeting.id ? (
+                                <>Copied!</>
+                              ) : (
+                                <>Copy Invitation</>
+                              )}
+                            </button>
+                          </div>
+                        ) : canJoinNow(meeting) ? (
+                          <button 
+                            onClick={() => handleJoinMeeting(meeting.id)}
+                            className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
+                          >
+                            Join
+                          </button>
+                        ) : (
+                          <span className="text-[12px] text-[#9CA3AF] italic ml-2">
+                            Starts {format(new Date(meeting.startTime), 'h:mm a')}
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => isMeetingHost ? setDeleteMeetingId(meeting.id) : setLeaveMeetingId(meeting.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 ml-2 text-[#9CA3AF] hover:text-[#EF4444] hover:bg-[#FEE2E2] rounded-md transition-all"
+                          title={isMeetingHost ? "Delete Meeting" : "Leave Meeting"}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Add Participants Popup */}
+                      {activeMeetingManageId === meeting.id && (
+                        <div ref={manageParticipantsRef} className="absolute top-[80%] right-5 mt-2 w-[480px] bg-white border border-[#E5E7EB] rounded-lg shadow-xl z-[60] p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="relative flex-1">
+                              <button
+                                type="button"
+                                onClick={() => setIsManageTeamDropdownOpen(!isManageTeamDropdownOpen)}
+                                className="w-full flex items-center justify-between bg-white border border-[#E5E7EB] rounded-md px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                              >
+                                <span className="truncate">
+                                  {teams.find((t: any) => t._id === manageSelectedTeamId)?.name || 'Select a Team'}
+                                </span>
+                                <ChevronDown size={14} className="text-[#9CA3AF]" />
+                              </button>
+                              {isManageTeamDropdownOpen && (
+                                <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-50 max-h-[160px] overflow-y-auto">
+                                  {teams.map((team: any) => (
+                                    <button
+                                      key={team._id}
+                                      type="button"
+                                      onClick={() => {
+                                        setManageSelectedTeamId(team._id);
+                                        setIsManageTeamDropdownOpen(false);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F3F4F6] transition-colors"
+                                    >
+                                      {team.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="relative flex-1">
+                              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                              <input
+                                type="text"
+                                placeholder="Search teammates..."
+                                value={manageSearchQuery}
+                                onChange={(e) => setManageSearchQuery(e.target.value)}
+                                className="w-full pl-8 pr-3 py-1.5 border border-[#E5E7EB] rounded-md text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {manageTeamMembers.length > 0 && (
+                            <div className="flex items-center justify-between mb-3 px-1">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId)).length > 0 &&
+                                  manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId)).every((m: any) => newParticipants.includes(m.clerkId))
+                                }
+                                onChange={(e) => {
+                                  const eligibleMembers = manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId));
+                                  if (e.target.checked) {
+                                    const idsToAdd = eligibleMembers.map((m: any) => m.clerkId);
+                                    setNewParticipants(Array.from(new Set([...newParticipants, ...idsToAdd])));
+                                  } else {
+                                    const idsToRemove = eligibleMembers.map((m: any) => m.clerkId);
+                                    setNewParticipants(newParticipants.filter((id: string) => !idsToRemove.includes(id)));
+                                  }
+                                }}
+                                className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                              />
+                              <span className="text-[13px] font-[500] text-[#374151]">Select all members of this team</span>
+                              </label>
+                              <span className="text-[12px] font-[500] text-[#6B7280]">{newParticipants.length} selected</span>
+                            </div>
+                          )}
+
+                          <div className="max-h-[200px] overflow-y-auto border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB] mb-3">
+                            {isLoadingManageMembers ? (
+                              <div className="p-3 text-[13px] text-[#6B7280] text-center">Loading...</div>
+                            ) : manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(manageSearchQuery.toLowerCase())).length === 0 ? (
+                              <div className="p-3 text-[13px] text-[#6B7280] text-center">No team members found</div>
+                            ) : manageTeamMembers
+                                .filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(manageSearchQuery.toLowerCase()))
+                                .map((member: any) => {
+                                  const isAlreadyParticipant = meeting.attendees?.some((a: any) => a.clerkId === member.clerkId);
+                                  const isPendingInvite = meeting.pendingInvitees?.some((a: any) => a.clerkId === member.clerkId);
+                                  const isAlreadyInMeeting = isAlreadyParticipant || isPendingInvite;
+                                  const isSelected = newParticipants.includes(member.clerkId);
+
+                                  return (
+                                    <div key={member.clerkId} className="flex items-center justify-between p-3 hover:bg-[#F9FAFB] transition-colors">
+                                      <div className="flex items-center gap-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isAlreadyInMeeting || isSelected}
+                                          disabled={isAlreadyInMeeting}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setNewParticipants([...newParticipants, member.clerkId]);
+                                            } else {
+                                              setNewParticipants(newParticipants.filter((id) => id !== member.clerkId));
+                                            }
+                                          }}
+                                          className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5] disabled:opacity-50"
+                                        />
+                                        {member.profileImage ? (
+                                          <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ background: getAvatarColor(member.clerkId) }}>
+                                            {getInitials(member.name)}
+                                          </div>
+                                        )}
+                                        <span className="text-[13px] font-[500] text-[#111827]">{member.name}</span>
+                                      </div>
+                                      {isAlreadyInMeeting && (
+                                        <button
+                                          onClick={() => setRemoveConfirmParticipant({ meetingId: meeting.id, clerkId: member.clerkId, name: member.name })}
+                                          className="text-[#9CA3AF] hover:text-[#EF4444] p-1 rounded-md hover:bg-[#FEE2E2] transition-colors"
+                                          title="Remove participant"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                          </div>
+                          
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setActiveMeetingManageId(null)}
+                              className="px-3 py-1.5 text-[13px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => inviteToMeeting({ id: meeting.id, participantClerkIds: newParticipants })}
+                              disabled={newParticipants.length === 0 || isInvitingToMeeting}
+                              className="px-3 py-1.5 text-[13px] font-[500] text-white bg-[#4F46E5] hover:bg-[#4338CA] rounded-md transition-colors disabled:opacity-50"
+                            >
+                              {isInvitingToMeeting ? 'Inviting...' : 'Invite'}
+                            </button>
+                          </div>
+
+                          {removeConfirmParticipant?.meetingId === meeting.id && (
+                            <div ref={removeConfirmRef} className="absolute top-full mt-2 right-0 w-[300px] bg-white border border-[#E5E7EB] rounded-lg shadow-xl p-5 z-[70]">
+                              <h3 className="text-[16px] font-[600] text-[#111827] mb-2">Remove Participant</h3>
+                              <p className="text-[13px] text-[#4B5563] mb-5">
+                                Do you really want to remove <span className="font-semibold text-[#111827]">{removeConfirmParticipant?.name}</span> from this meeting?
+                              </p>
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => setRemoveConfirmParticipant(null)}
+                                  className="px-3 py-1.5 text-[13px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                                >
+                                  No
+                                </button>
+                                <button
+                                  onClick={() => removeConfirmParticipant && removeMeetingParticipant({ id: removeConfirmParticipant.meetingId, participantClerkId: removeConfirmParticipant.clerkId })}
+                                  disabled={isRemovingParticipant}
+                                  className="px-3 py-1.5 text-[13px] font-[500] text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-md transition-colors disabled:opacity-50"
+                                >
+                                  {isRemovingParticipant ? 'Removing...' : 'Yes'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -650,6 +1173,93 @@ export default function Dashboard() {
     );
   }
 
+  if (tab === 'recordings') {
+    const filteredRecordings = meetingSearchQuery.trim()
+      ? recordingsList.filter((m: any) => m.topic?.toLowerCase().includes(meetingSearchQuery.trim().toLowerCase()))
+      : recordingsList;
+
+    return (
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-[24px] font-[600] text-[#111827]">Recordings & Transcripts</h2>
+          <div className="relative mr-14">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+            <input
+              type="text"
+              placeholder="Search recordings..."
+              value={meetingSearchQuery}
+              onChange={(e) => setMeetingSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-[260px]"
+            />
+          </div>
+        </div>
+
+        {isLoadingRecordings ? (
+          <div className="text-[#6B7280] text-[14px]">Loading recordings...</div>
+        ) : (
+          <div className="space-y-8">
+            <div className="bg-white border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] flex flex-col">
+              {filteredRecordings.length === 0 ? (
+                <div className="p-5 text-[#6B7280] text-[14px]">No recordings found.</div>
+              ) : filteredRecordings.map((meeting: any, index: number) => {
+                const meetingDate = new Date(meeting.startTime);
+                const timeStr = format(meetingDate, 'MMM d, yyyy');
+                const durationStr = formatDurationSeconds(meeting.recordingDurationSeconds || 0);
+                
+                return (
+                  <div 
+                    key={meeting._id || meeting.id} 
+                    onClick={() => navigate(`/recordings/${meeting._id || meeting.id}`)}
+                    className={`p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors cursor-pointer ${index !== filteredRecordings.length - 1 ? 'border-b border-[#F3F4F6]' : ''} ${index === 0 ? 'rounded-t-[12px]' : ''} ${index === filteredRecordings.length - 1 ? 'rounded-b-[12px]' : ''}`}
+                  >
+                    <div className="flex flex-col">
+                      <h4 className="text-[15px] font-[600] text-[#111827] mb-1">{meeting.topic || 'Untitled Meeting'}</h4>
+                      <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={13} />
+                          <span>{timeStr}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={13} />
+                          <span>{durationStr}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex -space-x-[8px]">
+                        {(meeting.resolvedParticipants || []).slice(0, 5).map((attendee: any, i: number) => (
+                          attendee.profileImage ? (
+                            <img
+                              key={i}
+                              src={attendee.profileImage}
+                              alt={attendee.name}
+                              title={attendee.name}
+                              className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div
+                              key={i}
+                              className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
+                              style={{ background: getAvatarColor(attendee.clerkId) }}
+                              title={attendee.name}
+                            >
+                              {getInitials(attendee.name)}
+                            </div>
+                          )
+                        ))}
+                      </div>
+                      <ChevronRight size={18} className="text-[#9CA3AF] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (tab === 'analytics') {
     const taskStatusData = [
       { name: 'Backlog', value: myTasks.filter((t: any) => t.status === 'backlog').length, color: '#6B7280' },
@@ -677,11 +1287,54 @@ export default function Dashboard() {
       padding: '8px 12px'
     };
 
+    const handleExportAnalyticsCsv = () => {
+      const rows: string[][] = [];
+      rows.push(['Metric', 'Value']);
+      rows.push(['Total Meetings', String(analytics?.totalMeetings ?? 0)]);
+      rows.push(['Avg Duration (min)', String(analytics?.avgDurationMinutes ?? 0)]);
+      rows.push(['Total Hours', String(analytics?.totalHours ?? 0)]);
+      rows.push(['Avg Rating', String(analytics?.avgRating ?? 'N/A')]);
+      rows.push(['Avg Attendees / Meeting', String(analytics?.engagement?.avgAttendeesPerMeeting ?? 0)]);
+      rows.push(['Rating Response Rate (%)', String(analytics?.engagement?.ratingResponseRate ?? 0)]);
+      if (analytics?.productivity) {
+        rows.push(['Task Completion Rate (%)', String(analytics.productivity.taskCompletionRate)]);
+        rows.push(['Overdue Tasks', String(analytics.productivity.overdueTasks)]);
+        rows.push(['Avg Action Items / Meeting', String(analytics.productivity.avgActionItemsPerMeeting)]);
+        rows.push(['Action Item -> Task Conversion (%)', String(analytics.productivity.actionItemToTaskConversionRate)]);
+      }
+      rows.push([]);
+      rows.push(['Week', 'Meetings']);
+      (analytics?.weeklyTrend || []).forEach((w: any) => rows.push([w.week, String(w.count)]));
+      rows.push([]);
+      rows.push(['Top Participant', 'Meetings Together']);
+      (analytics?.engagement?.topParticipants || []).forEach((p: any) => rows.push([p.name, String(p.meetingCount)]));
+
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `analytics-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    };
+
     return (
       <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
-        <div className="mb-8">
-          <h2 className="text-[24px] font-[700] text-[#111827]">Analytics</h2>
-          <p className="text-[#6B7280] text-[14px] mt-1">Your meeting activity, engagement, and team throughput at a glance.</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h2 className="text-[24px] font-[700] text-[#111827]">Analytics</h2>
+            <p className="text-[#6B7280] text-[14px] mt-1">Your meeting activity, engagement, and team throughput at a glance.</p>
+          </div>
+          <button
+            onClick={handleExportAnalyticsCsv}
+            disabled={isLoadingAnalytics}
+            className="h-[36px] px-4 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center gap-2 mr-14 disabled:opacity-50"
+          >
+            <Download size={16} /> Export Report
+          </button>
         </div>
 
         {isLoadingAnalytics ? (
@@ -783,6 +1436,81 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Productivity Metrics */}
+            <div className="bg-white p-6 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center gap-2 mb-5">
+                <TrendingUp size={18} className="text-[#4F46E5]" />
+                <h3 className="text-[15px] font-[600] text-[#111827]">Productivity Metrics</h3>
+              </div>
+              {!analytics?.productivity ? (
+                <div className="text-[#9CA3AF] text-[13px]">Select a team to see productivity metrics.</div>
+              ) : (
+                <div className="grid grid-cols-4 gap-5">
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Task Completion Rate</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics.productivity.taskCompletionRate}%</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Overdue Tasks</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics.productivity.overdueTasks}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Avg Action Items / Meeting</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics.productivity.avgActionItemsPerMeeting}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Action Item → Task Rate</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics.productivity.actionItemToTaskConversionRate}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Engagement Report */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center gap-2 mb-5">
+                  <Users size={18} className="text-[#4F46E5]" />
+                  <h3 className="text-[15px] font-[600] text-[#111827]">Engagement Overview</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Avg Attendees / Meeting</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics?.engagement?.avgAttendeesPerMeeting ?? 0}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Rating Response Rate</h4>
+                    <span className="text-[24px] font-[700] text-[#111827]">{analytics?.engagement?.ratingResponseRate ?? 0}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+                <h3 className="text-[15px] font-[600] text-[#111827] mb-5">Most Engaged Teammates</h3>
+                {(!analytics?.engagement?.topParticipants || analytics.engagement.topParticipants.length === 0) ? (
+                  <div className="text-[#9CA3AF] text-[13px]">Not enough meeting history yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {analytics.engagement.topParticipants.map((p: any, idx: number) => (
+                      <div key={p.clerkId || idx} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {p.profileImage ? (
+                            <img src={p.profileImage} alt={p.name} className="w-8 h-8 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: getAvatarColor(p.clerkId || p.name) }}>
+                              {getInitials(p.name)}
+                            </div>
+                          )}
+                          <span className="text-[14px] font-[500] text-[#111827]">{p.name}</span>
+                        </div>
+                        <span className="text-[13px] text-[#6B7280]">{p.meetingCount} meetings</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1088,7 +1816,7 @@ export default function Dashboard() {
         </div>
 
         {/* Section 3 — Core Action Launcher (Compact Zoom-style) */}
-        <div className="flex justify-center gap-[80px] mt-[44px] w-full">
+        <div className="flex justify-evenly mt-[44px] w-full">
           {/* Action 1 */}
           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={handleNewMeeting}>
             <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
@@ -1104,7 +1832,7 @@ export default function Dashboard() {
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">Join</span>
           </div>
           {/* Action 3 */}
-          <div className="flex flex-col items-center gap-2 cursor-pointer group">
+          <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => { setScheduleSelectedTeamId(currentTeamId); setScheduleOpenForAll(false); setIsScheduleModalOpen(true); }}>
             <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
               <Calendar size={24} className="text-[#4F46E5]" />
             </button>
@@ -1120,31 +1848,31 @@ export default function Dashboard() {
               <h2 className="text-[16px] font-[600] text-[#111827]">Upcoming Meetings</h2>
               <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View Calendar &rarr;</button>
             </div>
-            <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col flex-1">
+            <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1">
               <div className="flex flex-col">
                 {isLoadingUpcoming ? (
                   <div className="p-5 text-[#6B7280] text-[14px]">Loading upcoming meetings...</div>
                 ) : upcomingMeetings.length === 0 ? (
                   <div className="p-5 text-[#6B7280] text-[14px]">No upcoming meetings</div>
-                ) : upcomingMeetings.map((meeting: any, index: number) => {
+                ) : upcomingMeetings.slice(0, 4).map((meeting: any, index: number) => {
                   const meetingDate = new Date(meeting.startTime || meeting.date);
                   const isMeetingToday = isToday(meetingDate);
-                  const timeStr = format(meetingDate, 'h:mm a');
-                  const durationStr = formatMeetingDuration(meeting.startTime || meeting.date, meeting.endTime, meeting.estimatedDuration);
+                  const timeStr = format(meetingDate, 'd MMMM yyyy h:mm a');
+                  const isMeetingHost = meeting.hostClerkId === user?.id;
                   
                   return (
                   <div 
                     key={meeting.id} 
-                    className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== upcomingMeetings.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
+                    className={`relative p-5 flex items-center justify-between group hover:bg-[#F9FAFB] transition-colors ${index !== upcomingMeetings.length - 1 ? 'border-b border-[#F3F4F6]' : ''} ${index === 0 ? 'rounded-t-[12px]' : ''} ${index === Math.min(upcomingMeetings.length, 4) - 1 ? 'rounded-b-[12px]' : ''}`}
                   >
                     {/* Left Border indicator */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${isMeetingToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
+                    <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${index === 0 ? 'rounded-tl-[12px]' : ''} ${index === Math.min(upcomingMeetings.length, 4) - 1 ? 'rounded-bl-[12px]' : ''} ${isMeetingToday ? 'bg-[#4F46E5]' : 'bg-[#E5E7EB]'}`} />
                     
                     <div className="flex-1 pl-2">
                       <h4 className="text-[15px] font-[600] text-[#111827] mb-1">{meeting.title}</h4>
                       <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-1.5">
                         <Calendar size={13} />
-                        <span>{timeStr} • {durationStr}</span>
+                        <span>{timeStr}</span>
                       </div>
                     </div>
                     
@@ -1152,30 +1880,262 @@ export default function Dashboard() {
                       {/* Avatars */}
                       <div className="flex -space-x-[8px]">
                         {meeting.attendees?.map((attendee: any, i: number) => (
-                          <div 
-                            key={i} 
-                            className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
-                            style={{ background: attendee.color }}
-                            title={attendee.name}
-                          >
-                            {attendee.initials}
-                          </div>
+                          attendee.profileImage ? (
+                            <img 
+                              key={i}
+                              src={attendee.profileImage} 
+                              alt={attendee.name}
+                              title={attendee.name}
+                              className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div 
+                              key={i} 
+                              className="w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
+                              style={{ background: attendee.color }}
+                              title={attendee.name}
+                            >
+                              {attendee.initials}
+                            </div>
+                          )
                         ))}
                       </div>
                       
-                      <button 
-                        onClick={() => handleJoinMeeting(meeting.id)}
-                        className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
+                      {isMeetingHost && (
+                        <button
+                          onClick={() => {
+                            if (activeMeetingManageId === meeting.id) {
+                              setActiveMeetingManageId(null);
+                            } else {
+                              setActiveMeetingManageId(meeting.id);
+                              setManageSelectedTeamId(currentTeamId);
+                              setManageSearchQuery('');
+                              setNewParticipants([]);
+                            }
+                          }}
+                          className="manage-participants-btn w-[28px] h-[28px] rounded-full border-[2px] border-[#FFFFFF] bg-[#E5E7EB] hover:bg-[#D1D5DB] flex items-center justify-center text-[#4B5563] ml-1 z-10 transition-colors"
+                          title="Manage Participants"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
+
+                      {isMeetingHost ? (
+                        <div className="flex items-center gap-2 ml-1">
+                          <button
+                            onClick={() => handleJoinMeeting(meeting.id)}
+                            className="h-[32px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[6px] text-[13px] font-[500] transition-colors"
+                          >
+                            Start
+                          </button>
+                          <button
+                            onClick={() => handleCopyInvitation(meeting)}
+                            className="h-[32px] px-3 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-[6px] text-[13px] font-[500] transition-colors flex items-center gap-1.5"
+                          >
+                            {copiedMeetingId === meeting.id ? (
+                              <>Copied!</>
+                            ) : (
+                              <>Copy Invitation</>
+                            )}
+                          </button>
+                        </div>
+                      ) : canJoinNow(meeting) ? (
+                        <button 
+                          onClick={() => handleJoinMeeting(meeting.id)}
+                          className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
+                        >
+                          Join
+                        </button>
+                      ) : (
+                        <span className="text-[12px] text-[#9CA3AF] italic ml-2">
+                          Starts {format(new Date(meeting.startTime), 'h:mm a')}
+                        </span>
+                      )}
+
+                      <button
+                        onClick={() => isMeetingHost ? setDeleteMeetingId(meeting.id) : setLeaveMeetingId(meeting.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 ml-2 text-[#9CA3AF] hover:text-[#EF4444] hover:bg-[#FEE2E2] rounded-md transition-all"
+                        title={isMeetingHost ? "Delete Meeting" : "Leave Meeting"}
                       >
-                        Join
+                        <X size={16} />
                       </button>
                     </div>
+
+                    {/* Add Participants Popup */}
+                    {activeMeetingManageId === meeting.id && (
+                      <div ref={manageParticipantsRef} className="absolute top-[80%] right-5 mt-2 w-[480px] bg-white border border-[#E5E7EB] rounded-lg shadow-xl z-[60] p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="relative flex-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsManageTeamDropdownOpen(!isManageTeamDropdownOpen)}
+                              className="w-full flex items-center justify-between bg-white border border-[#E5E7EB] rounded-md px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                            >
+                              <span className="truncate">
+                                {teams.find((t: any) => t._id === manageSelectedTeamId)?.name || 'Select a Team'}
+                              </span>
+                              <ChevronDown size={14} className="text-[#9CA3AF]" />
+                            </button>
+                            {isManageTeamDropdownOpen && (
+                              <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-50 max-h-[160px] overflow-y-auto">
+                                {teams.map((team: any) => (
+                                  <button
+                                    key={team._id}
+                                    type="button"
+                                    onClick={() => {
+                                      setManageSelectedTeamId(team._id);
+                                      setIsManageTeamDropdownOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F3F4F6] transition-colors"
+                                  >
+                                    {team.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="relative flex-1">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                            <input
+                              type="text"
+                              placeholder="Search teammates..."
+                              value={manageSearchQuery}
+                              onChange={(e) => setManageSearchQuery(e.target.value)}
+                              className="w-full pl-8 pr-3 py-1.5 border border-[#E5E7EB] rounded-md text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {manageTeamMembers.length > 0 && (
+                          <div className="flex items-center justify-between mb-3 px-1">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={
+                                manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId)).length > 0 &&
+                                manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId)).every((m: any) => newParticipants.includes(m.clerkId))
+                              }
+                              onChange={(e) => {
+                                const eligibleMembers = manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && !meeting.attendees?.some((a: any) => a.clerkId === m.clerkId) && !meeting.pendingInvitees?.some((a: any) => a.clerkId === m.clerkId));
+                                if (e.target.checked) {
+                                  const idsToAdd = eligibleMembers.map((m: any) => m.clerkId);
+                                  setNewParticipants(Array.from(new Set([...newParticipants, ...idsToAdd])));
+                                } else {
+                                  const idsToRemove = eligibleMembers.map((m: any) => m.clerkId);
+                                  setNewParticipants(newParticipants.filter((id: string) => !idsToRemove.includes(id)));
+                                }
+                              }}
+                              className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                            />
+                            <span className="text-[13px] font-[500] text-[#374151]">Select all members of this team</span>
+                            </label>
+                            <span className="text-[12px] font-[500] text-[#6B7280]">{newParticipants.length} selected</span>
+                          </div>
+                        )}
+
+                        <div className="max-h-[200px] overflow-y-auto border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB] mb-3">
+                          {isLoadingManageMembers ? (
+                            <div className="p-3 text-[13px] text-[#6B7280] text-center">Loading...</div>
+                          ) : manageTeamMembers.filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(manageSearchQuery.toLowerCase())).length === 0 ? (
+                            <div className="p-3 text-[13px] text-[#6B7280] text-center">No team members found</div>
+                          ) : manageTeamMembers
+                              .filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(manageSearchQuery.toLowerCase()))
+                              .map((member: any) => {
+                                const isAlreadyParticipant = meeting.attendees.some((a: any) => a.clerkId === member.clerkId);
+                                const isPendingInvite = meeting.pendingInvitees?.some((a: any) => a.clerkId === member.clerkId);
+                                const isAlreadyInMeeting = isAlreadyParticipant || isPendingInvite;
+                                const isSelected = newParticipants.includes(member.clerkId);
+
+                                return (
+                                  <div key={member.clerkId} className="flex items-center justify-between p-3 hover:bg-[#F9FAFB] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isAlreadyInMeeting || isSelected}
+                                        disabled={isAlreadyInMeeting}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setNewParticipants([...newParticipants, member.clerkId]);
+                                          } else {
+                                            setNewParticipants(newParticipants.filter((id) => id !== member.clerkId));
+                                          }
+                                        }}
+                                        className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5] disabled:opacity-50"
+                                      />
+                                      {member.profileImage ? (
+                                        <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full object-cover" />
+                                      ) : (
+                                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ background: getAvatarColor(member.clerkId) }}>
+                                          {getInitials(member.name)}
+                                        </div>
+                                      )}
+                                      <span className="text-[13px] font-[500] text-[#111827]">{member.name}</span>
+                                    </div>
+                                    {isAlreadyInMeeting && (
+                                      <button
+                                        onClick={() => setRemoveConfirmParticipant({ meetingId: meeting.id, clerkId: member.clerkId, name: member.name })}
+                                        className="text-[#9CA3AF] hover:text-[#EF4444] p-1 rounded-md hover:bg-[#FEE2E2] transition-colors"
+                                        title="Remove participant"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                        </div>
+                        
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setActiveMeetingManageId(null)}
+                            className="px-3 py-1.5 text-[13px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => inviteToMeeting({ id: meeting.id, participantClerkIds: newParticipants })}
+                            disabled={newParticipants.length === 0 || isInvitingToMeeting}
+                            className="px-3 py-1.5 text-[13px] font-[500] text-white bg-[#4F46E5] hover:bg-[#4338CA] rounded-md transition-colors disabled:opacity-50"
+                          >
+                            {isInvitingToMeeting ? 'Inviting...' : 'Invite'}
+                          </button>
+                        </div>
+
+                        {removeConfirmParticipant?.meetingId === meeting.id && (
+                          <div ref={removeConfirmRef} className="absolute top-0 -right-[320px] w-[300px] bg-white border border-[#E5E7EB] rounded-lg shadow-xl p-5 z-[70]">
+                            <h3 className="text-[16px] font-[600] text-[#111827] mb-2">Remove Participant</h3>
+                            <p className="text-[13px] text-[#4B5563] mb-5">
+                              Do you really want to remove <span className="font-semibold text-[#111827]">{removeConfirmParticipant?.name}</span> from this meeting?
+                            </p>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setRemoveConfirmParticipant(null)}
+                                className="px-3 py-1.5 text-[13px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                              >
+                                No
+                              </button>
+                              <button
+                                onClick={() => removeConfirmParticipant && removeMeetingParticipant({ id: removeConfirmParticipant.meetingId, participantClerkId: removeConfirmParticipant.clerkId })}
+                                disabled={isRemovingParticipant}
+                                className="px-3 py-1.5 text-[13px] font-[500] text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {isRemovingParticipant ? 'Removing...' : 'Yes'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   );
                 })}
               </div>
               <div className="border-t border-[#F3F4F6] p-3 text-center mt-auto shrink-0">
-                <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">See all meetings &rarr;</button>
+                {upcomingMeetings.length > 0 && (
+                  <button onClick={() => navigate('/dashboard?tab=meetings')} className="text-[#4F46E5] text-[13px] font-[400] hover:underline">
+                    See all meetings &rarr;
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1287,13 +2247,22 @@ export default function Dashboard() {
                       </span>
                     )}
                     <span className="text-[12px] font-[400] text-[#9CA3AF]">{task.due}</span>
-                    <div 
-                      className="w-[24px] h-[24px] rounded-full border border-[#FFFFFF] flex items-center justify-center text-white text-[9px] font-bold shadow-sm transition-opacity opacity-100"
-                      style={{ background: task.assignee?.color || '#9CA3AF' }}
-                      title={task.assignee?.name || 'Unassigned'}
-                    >
-                      {task.assignee?.initials || '?'}
-                    </div>
+                    {task.assignee?.profileImage ? (
+                      <img 
+                        src={task.assignee.profileImage} 
+                        alt={task.assignee.name}
+                        title={task.assignee.name}
+                        className="w-[24px] h-[24px] rounded-full border border-[#FFFFFF] object-cover shadow-sm"
+                      />
+                    ) : (
+                      <div 
+                        className="w-[24px] h-[24px] rounded-full border border-[#FFFFFF] flex items-center justify-center text-white text-[9px] font-bold shadow-sm transition-opacity opacity-100"
+                        style={{ background: task.assignee?.color || '#9CA3AF' }}
+                        title={task.assignee?.name || 'Unassigned'}
+                      >
+                        {task.assignee?.initials || '?'}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1323,6 +2292,19 @@ export default function Dashboard() {
                   className="w-full border border-[#D1D5DB] rounded-lg px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent outline-none transition-all"
                   autoFocus
                 />
+              </div>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="pr-3">
+                  <label className="block text-[13px] font-[500] text-[#374151] mb-0.5">Make this meeting open for all</label>
+                  <p className="text-[12px] text-[#9CA3AF]">Anyone with the link or code joins instantly — no admit needed</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOpenForAll(prev => !prev)}
+                  className={`w-10 h-[22px] rounded-full relative transition-colors flex-shrink-0 ${isOpenForAll ? 'bg-[#4F46E5]' : 'bg-[#D1D5DB]'}`}
+                >
+                  <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isOpenForAll ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                </button>
               </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setIsNewMeetingModalOpen(false)} className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-lg transition-colors">
@@ -1370,6 +2352,262 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
+              <h3 className="text-[16px] font-[600] text-[#111827]">Schedule Meeting</h3>
+              <button onClick={() => { setIsScheduleModalOpen(false); setScheduleSuccessMessage(null); setScheduleSearchQuery(''); setScheduleOpenForAll(false); }} className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors p-1 rounded-full hover:bg-[#F3F4F6]">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={submitScheduleMeeting} className="p-5">
+              {scheduleSuccessMessage ? (
+                <div className="py-6 text-center">
+                  <div className="text-[#10B981] text-[14px] font-medium mb-4">{scheduleSuccessMessage}</div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsScheduleModalOpen(false); setScheduleSuccessMessage(null); setScheduleSearchQuery(''); }}
+                    className="px-4 py-2 bg-[#4F46E5] text-white text-[14px] font-[500] rounded-lg hover:bg-[#4338CA] transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-5">
+                    <label className="block text-[13px] font-[500] text-[#374151] mb-2">Meeting Topic</label>
+                    <input 
+                      type="text" 
+                      value={scheduleTitle}
+                      onChange={(e) => setScheduleTitle(e.target.value)}
+                      className="w-full border border-[#D1D5DB] rounded-lg px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent outline-none transition-all"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="mb-5">
+                    <label className="block text-[13px] font-[500] text-[#374151] mb-2">Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      min={new Date().toISOString().slice(0, 16)}
+                      value={scheduleDateTime}
+                      onChange={(e) => setScheduleDateTime(e.target.value)}
+                      className="w-full border border-[#D1D5DB] rounded-lg px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent outline-none transition-all"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-5 flex items-center justify-between">
+                    <div className="pr-3">
+                      <label className="block text-[13px] font-[500] text-[#374151] mb-0.5">Make this meeting open for all</label>
+                      <p className="text-[12px] text-[#9CA3AF]">Anyone with the link or code joins instantly — no admit needed</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleOpenForAll(prev => !prev)}
+                      className={`w-10 h-[22px] rounded-full relative transition-colors flex-shrink-0 ${scheduleOpenForAll ? 'bg-[#4F46E5]' : 'bg-[#D1D5DB]'}`}
+                    >
+                      <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${scheduleOpenForAll ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[13px] font-[500] text-[#374151]">Add Participants</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsScheduleTeamDropdownOpen(!isScheduleTeamDropdownOpen)}
+                          className="flex items-center gap-1.5 bg-white border border-[#E5E7EB] rounded-md px-2.5 py-1 text-[12px] font-[500] text-[#374151] hover:border-[#D1D5DB] transition-colors"
+                        >
+                          <div
+                            className="w-4 h-4 rounded-[4px] flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
+                            style={{ background: getAvatarColor(scheduleSelectedTeamId || '') }}
+                          >
+                            {getInitials(teams.find((t) => t._id === scheduleSelectedTeamId)?.name)}
+                          </div>
+                          <span className="truncate max-w-[100px]">{teams.find((t) => t._id === scheduleSelectedTeamId)?.name || 'Select team'}</span>
+                          <ChevronDown size={12} />
+                        </button>
+                        {isScheduleTeamDropdownOpen && (
+                          <div className="absolute right-0 mt-1 w-48 bg-white border border-[#E5E7EB] rounded-lg shadow-lg z-30 py-1 max-h-[200px] overflow-y-auto">
+                            {teams.map((team) => (
+                              <button
+                                key={team._id}
+                                type="button"
+                                onClick={() => { setScheduleSelectedTeamId(team._id); setIsScheduleTeamDropdownOpen(false); }}
+                                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${team._id === scheduleSelectedTeamId ? 'bg-[#EEF2FF]' : 'hover:bg-[#F9FAFB]'}`}
+                              >
+                                <div
+                                  className="w-5 h-5 rounded-[5px] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                                  style={{ background: getAvatarColor(team._id) }}
+                                >
+                                  {getInitials(team.name)}
+                                </div>
+                                <span className="text-[12px] font-[500] text-[#111827] truncate">{team.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative mb-2">
+                      <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                      <input
+                        type="text"
+                        placeholder="Search teammates..."
+                        value={scheduleSearchQuery}
+                        onChange={(e) => setScheduleSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 border border-[#E5E7EB] rounded-md text-[12px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                      />
+                    </div>
+
+                    {scheduleTeamMembers.length > 0 && (
+                      <div className="flex items-center justify-between mb-3 px-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleParticipants.length === scheduleTeamMembers.filter((m: any) => m.clerkId !== user?.id).length && scheduleTeamMembers.filter((m: any) => m.clerkId !== user?.id).length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setScheduleParticipants(
+                                scheduleTeamMembers
+                                  .filter((m: any) => m.clerkId !== user?.id)
+                                  .map((m: any) => ({ clerkId: m.clerkId, name: m.name }))
+                              );
+                            } else {
+                              setScheduleParticipants([]);
+                            }
+                          }}
+                          className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                        />
+                        <span className="text-[13px] font-[500] text-[#374151]">Select all members of this team</span>
+                        </label>
+                        <span className="text-[12px] font-[500] text-[#6B7280]">{scheduleParticipants.length} selected</span>
+                      </div>
+                    )}
+
+                    <div className="max-h-[160px] overflow-y-auto border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB]">
+                      {isLoadingScheduleMembers ? (
+                        <div className="p-3 text-[13px] text-[#6B7280] text-center">Loading teammates...</div>
+                      ) : scheduleTeamMembers.filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(scheduleSearchQuery.toLowerCase())).length === 0 ? (
+                        <div className="p-3 text-[13px] text-[#6B7280] text-center">No teammates found</div>
+                      ) : scheduleTeamMembers
+                          .filter((m: any) => m.clerkId !== user?.id && m.name?.toLowerCase().includes(scheduleSearchQuery.toLowerCase()))
+                          .map((member: any) => {
+                            const isSelected = scheduleParticipants.some(p => p.clerkId === member.clerkId);
+                            return (
+                              <label key={member.clerkId} className="flex items-center gap-3 p-3 hover:bg-[#F9FAFB] cursor-pointer transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setScheduleParticipants([...scheduleParticipants, { clerkId: member.clerkId, name: member.name }]);
+                                    } else {
+                                      setScheduleParticipants(scheduleParticipants.filter((p) => p.clerkId !== member.clerkId));
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                                />
+                                {member.profileImage ? (
+                                  <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ background: getAvatarColor(member.clerkId) }}>
+                                    {getInitials(member.name)}
+                                  </div>
+                                )}
+                                <span className="text-[13px] font-[500] text-[#111827]">{member.name}</span>
+                              </label>
+                            );
+                          })}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setIsScheduleModalOpen(false);
+                        setScheduleTitle('');
+                        setScheduleDateTime('');
+                        setScheduleParticipants([]);
+                        setScheduleSuccessMessage(null);
+                        setScheduleSearchQuery('');
+                        setScheduleOpenForAll(false);
+                      }} 
+                      className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={isScheduling || !scheduleTitle.trim() || !scheduleDateTime} 
+                      className="px-4 py-2 bg-[#4F46E5] text-white text-[14px] font-[500] rounded-lg hover:bg-[#4338CA] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isScheduling ? 'Scheduling...' : 'Schedule Meeting'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Meeting Modal */}
+      {deleteMeetingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
+            <h3 className="text-[18px] font-[600] text-[#111827] mb-2">Delete Meeting</h3>
+            <p className="text-[14px] text-[#4B5563] mb-6">Do you want to delete this meeting?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteMeetingId(null)}
+                className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+              >
+                No
+              </button>
+              <button
+                onClick={() => deleteMeeting(deleteMeetingId)}
+                disabled={isDeletingMeeting}
+                className="px-4 py-2 text-[14px] font-[500] text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-md transition-colors disabled:opacity-50"
+              >
+                {isDeletingMeeting ? 'Deleting...' : 'Yes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Meeting Modal */}
+      {leaveMeetingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
+            <h3 className="text-[18px] font-[600] text-[#111827] mb-2">Leave Meeting</h3>
+            <p className="text-[14px] text-[#4B5563] mb-6">Do you want to leave this meeting?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setLeaveMeetingId(null)}
+                className="px-4 py-2 text-[14px] font-[500] text-[#374151] hover:bg-[#F3F4F6] rounded-md transition-colors"
+              >
+                No
+              </button>
+              <button
+                onClick={() => leaveMeeting(leaveMeetingId)}
+                disabled={isLeavingMeeting}
+                className="px-4 py-2 text-[14px] font-[500] text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-md transition-colors disabled:opacity-50"
+              >
+                {isLeavingMeeting ? 'Leaving...' : 'Yes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

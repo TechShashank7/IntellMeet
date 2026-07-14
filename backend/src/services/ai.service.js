@@ -50,9 +50,17 @@ ${transcript}
   try {
     parsed = JSON.parse(rawText);
   } catch (err) {
-    // Fallback: strip common markdown code-fence wrapping and retry once
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-    parsed = JSON.parse(cleaned); // let this throw if still invalid — caller handles it
+    // Fallback: Try to extract the JSON object using regex if Gemini included extra text
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (innerErr) {
+        throw new Error("Failed to parse extracted JSON from Gemini response");
+      }
+    } else {
+      throw new Error("Could not find valid JSON object in Gemini response");
+    }
   }
 
   return {
@@ -101,10 +109,13 @@ const summarizeAndPersist = async (meetingId) => {
     }))
   );
 
-  meeting.summary = summary;
-  meeting.actionItems = createdActionItems.map((ai) => ai._id);
-  meeting.aiProcessingStatus = "completed";
-  await meeting.save();
+  await Meeting.findByIdAndUpdate(meetingId, {
+    $set: {
+      summary: summary,
+      actionItems: createdActionItems.map((ai) => ai._id),
+      aiProcessingStatus: "completed"
+    }
+  });
 
   return { summary, actionItems: createdActionItems };
 };

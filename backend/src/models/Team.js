@@ -21,6 +21,18 @@ const teamSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    slackWebhookUrl: {
+      type: String,
+      default: null,
+    },
+    notionToken: {
+      type: String,
+      default: null,
+    },
+    notionPageId: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

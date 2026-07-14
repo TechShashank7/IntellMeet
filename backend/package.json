@@ -21,6 +21,7 @@
     "express-async-handler": "^1.2.0",
     "inngest": "^3.48.1",
     "mongoose": "^9.7.0",
+    "pdfkit": "^0.19.1",
     "stream-chat": "^9.47.0"
   },
   "devDependencies": {

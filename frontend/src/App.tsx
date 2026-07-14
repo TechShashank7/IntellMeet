@@ -1,9 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { SignIn, useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
+import SignInPage from './pages/SignInPage';
+import SignUpPage from './pages/SignUpPage';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import MeetingRoom from './pages/MeetingRoom';
 import AISummary from './pages/AISummary';
+import RecordingDetail from './pages/RecordingDetail';
 import TaskBoard from './pages/TaskBoard';
 import DashboardLayout from './layouts/DashboardLayout';
 import Onboarding from './pages/Onboarding';
@@ -25,11 +28,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login/*" element={
-          <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA]">
-            <SignIn routing="path" path="/login" fallbackRedirectUrl="/dashboard" signUpFallbackRedirectUrl="/dashboard" />
-          </div>
-        } />
+        <Route path="/login/*" element={<SignInPage />} />
+        <Route path="/signup/*" element={<SignUpPage />} />
         
         {/* Protected Routes with Sidebar Layout */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
@@ -42,6 +42,7 @@ function App() {
         <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
         <Route path="/meeting/:id" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
         <Route path="/summary/:id" element={<ProtectedRoute><AISummary /></ProtectedRoute>} />
+        <Route path="/recordings/:id" element={<ProtectedRoute><RecordingDetail /></ProtectedRoute>} />
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

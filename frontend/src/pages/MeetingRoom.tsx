@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useUser, useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { 
@@ -15,7 +15,7 @@ import {
 } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { StreamChat, Channel as StreamChannel } from 'stream-chat';
-import { getInitials, getAvatarColor, formatElapsedTime } from '../lib/utils';
+import { getInitials, getAvatarColor, formatElapsedTime, formatCountdown } from '../lib/utils';
 import { format } from 'date-fns';
 import AdaptiveMeetingLayout from '../components/AdaptiveMeetingLayout';
 import ParticipantListPanel from '../components/ParticipantListPanel';
@@ -60,7 +60,8 @@ import {
   VideoOff,
   MonitorUp,
   PhoneOff,
-  ChevronUp
+  ChevronUp,
+  Settings
 } from 'lucide-react';
 
 // Global timeout to prevent Stream SDK from tearing down during React Strict Mode double-invocations
@@ -91,8 +92,88 @@ export default function MeetingRoom() {
   const userImageUrl = user?.imageUrl;
   const isHost = userId === hostClerkId;
 
+  const [hasClickedJoin, setHasClickedJoin] = useState(false);
+  const [timeHasPassed, setTimeHasPassed] = useState(false);
+  const [msRemaining, setMsRemaining] = useState(0);
+
+  const meetingStartTime = meeting?.startTime ? new Date(meeting.startTime) : null;
+
+  useEffect(() => {
+    if (!meetingStartTime || isHost || meeting?.status !== 'scheduled') return;
+    const tick = () => {
+      const diff = meetingStartTime.getTime() - Date.now();
+      setMsRemaining(diff);
+      setTimeHasPassed(diff <= 0);
+    };
+    tick();
+    const interval = setInterval(tick, 1000); // local clock only, no network calls
+    return () => clearInterval(interval);
+  }, [meetingStartTime, isHost, meeting?.status]);
+
+  const mustWait = !isHost && meeting?.status === 'scheduled' && meetingStartTime && meetingStartTime > new Date() && !hasClickedJoin;
+
+  const [waitingRoomStatus, setWaitingRoomStatus] = useState<'checking' | 'waiting' | 'admitted' | 'denied'>('checking');
+
+  useEffect(() => {
+    if (mustWait) return;
+    if (!meetingId || !userId) return;
+    if (isHost) {
+      setWaitingRoomStatus('admitted');
+      return;
+    }
+    // If the API already reports us as a resolved attendee, skip the waiting room 
+    // entirely (covers rejoin-after-leave and already-admitted cases).
+    const alreadyParticipant = meeting?.attendees?.some((a: any) => a.clerkId === userId);
+    if (alreadyParticipant) {
+      setWaitingRoomStatus('admitted');
+      return;
+    }
+
+    let isMounted = true;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const start = async () => {
+      try {
+        const token = await getToken();
+        if (!token || !isMounted) return;
+        const result = await api.requestToJoinMeeting(meetingId, token);
+        if (!isMounted) return;
+        setWaitingRoomStatus(result.status);
+        if (result.status === 'waiting') {
+          pollTimer = setInterval(async () => {
+            try {
+              const pollToken = await getToken();
+              if (!pollToken) return;
+              const pollResult = await api.getWaitingRoomStatus(meetingId, pollToken);
+              if (!isMounted) return;
+              setWaitingRoomStatus(pollResult.status);
+              if (pollResult.status !== 'waiting' && pollTimer) {
+                clearInterval(pollTimer);
+              }
+            } catch (err) {
+              console.warn('Failed to poll waiting room status', err);
+            }
+          }, 2500);
+        }
+      } catch (err) {
+        console.warn('Failed to request to join meeting', err);
+        if (isMounted) setWaitingRoomStatus('admitted'); // fail-open so a network hiccup doesn't hard-block joining
+      }
+    };
+
+    start();
+
+    return () => {
+      isMounted = false;
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [mustWait, meetingId, userId, isHost, getToken, meeting?.attendees]);
+
   useEffect(() => {
     if (!callId || !userId) return;
+    if (mustWait) return;
+    if (waitingRoomStatus !== 'admitted') return;
+
     
     let isMounted = true;
     let _client: StreamVideoClient | null = null;
@@ -115,7 +196,7 @@ export default function MeetingRoom() {
         const token = await getToken();
         if (!token || !isMounted) return;
 
-        if (!isHost && meetingId) {
+        if (meetingId) {
           await api.joinMeeting(meetingId, token);
           if (!isMounted) return;
         }
@@ -188,12 +269,87 @@ export default function MeetingRoom() {
         setCall(null);
       }, 500);
     };
-  }, [callId, meetingId, hostClerkId, userId, userFullName, userImageUrl, getToken]);
+  }, [callId, meetingId, hostClerkId, userId, userFullName, userImageUrl, getToken, mustWait, waitingRoomStatus]);
 
   if (isLoading) {
     return (
       <div className="h-screen bg-[#0F172A] flex flex-col font-sans items-center justify-center">
         <div className="text-[#94A3B8]">Loading meeting room...</div>
+      </div>
+    );
+  }
+
+  if (mustWait) {
+    return (
+      <div className="h-screen bg-[#0F172A] flex flex-col items-center justify-center font-sans text-center px-6 relative">
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-6 left-6 flex items-center gap-2 text-[#94A3B8] hover:text-white transition-colors text-[14px] font-medium"
+        >
+          <ChevronLeft size={18} />
+          Back to Dashboard
+        </button>
+        {!timeHasPassed ? (
+          <>
+            <div className="text-[#94A3B8] text-[15px] mb-3">Meeting starts in</div>
+            <div className="text-white text-[40px] font-bold tabular-nums mb-3 tracking-tight">
+              {formatCountdown(msRemaining)}
+            </div>
+            <div className="text-[#64748B] text-[14px]">
+              {format(meetingStartTime!, "MMMM d, yyyy 'at' h:mm a")}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[#10B981] text-[16px] font-medium mb-4">You can join the meeting now</div>
+            <button
+              onClick={() => setHasClickedJoin(true)}
+              className="px-6 py-3 bg-[#4F46E5] text-white rounded-md font-medium hover:bg-[#4338CA] transition-colors"
+            >
+              Click here to join
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (waitingRoomStatus === 'checking' || waitingRoomStatus === 'waiting') {
+    return (
+      <div className="h-screen bg-[#0F172A] flex flex-col items-center justify-center font-sans text-center px-6 relative">
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-6 left-6 flex items-center gap-2 text-[#94A3B8] hover:text-white transition-colors text-[14px] font-medium"
+        >
+          <ChevronLeft size={18} />
+          Back to Dashboard
+        </button>
+        <div className="w-10 h-10 rounded-full border-2 border-[#4F46E5] border-t-transparent animate-spin mb-6" />
+        <div className="text-white text-[18px] font-medium mb-2">Waiting to be let in</div>
+        <div className="text-[#94A3B8] text-[14px]">You'll join automatically once the host admits you</div>
+      </div>
+    );
+  }
+
+  if (waitingRoomStatus === 'denied') {
+    return (
+      <div className="h-screen bg-[#0F172A] flex flex-col items-center justify-center font-sans text-center px-6 relative">
+        <div className="text-[#EF4444] text-[18px] font-medium mb-2">The host didn't admit you to this meeting</div>
+        <div className="text-[#94A3B8] text-[14px] mb-6">You can try again or head back to your dashboard</div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setWaitingRoomStatus('checking')}
+            className="px-5 py-2.5 bg-[#4F46E5] text-white rounded-md font-medium hover:bg-[#4338CA] transition-colors text-[14px]"
+          >
+            Try Again
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-5 py-2.5 bg-[#1E293B] text-white rounded-md font-medium hover:bg-[#334155] transition-colors text-[14px]"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
@@ -273,16 +429,88 @@ function MeetingRoomContent({
   meetingId: string | undefined;
   callId: string | undefined;
 }) {
-  const { useIsCallCaptioningInProgress, useMicrophoneState, useCameraState, useScreenShareState } = useCallStateHooks();
+  const { useIsCallCaptioningInProgress, useMicrophoneState, useCameraState, useScreenShareState, useCallCallingState } = useCallStateHooks();
+  const callingState = useCallCallingState();
   const captionsEnabled = useIsCallCaptioningInProgress();
   const { microphone, isMute: isMicMuted, devices: micDevices, selectedDevice: selectedMic } = useMicrophoneState();
   const { camera, isMute: isCamMuted, devices: camDevices, selectedDevice: selectedCam } = useCameraState();
   const { screenShare, isMute: isScreenShared } = useScreenShareState();
 
+  const { data: waitingRoomList = [] } = useQuery({
+    queryKey: ['waitingRoom', meetingId],
+    queryFn: async () => api.getWaitingRoom(meetingId || '', await getToken() || ''),
+    enabled: isHost && !!meetingId,
+    refetchInterval: 3000,
+  });
+
+  const queryClient = useQueryClient();
+
+  const { mutate: admitGuest } = useMutation({
+    mutationFn: async (clerkId: string) => {
+      const token = await getToken();
+      if (!token || !meetingId) return;
+      await api.admitParticipant(meetingId, clerkId, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['waitingRoom', meetingId] });
+      queryClient.invalidateQueries({ queryKey: ['meeting', id] });
+    }
+  });
+
+  const { mutate: denyGuest } = useMutation({
+    mutationFn: async (clerkId: string) => {
+      const token = await getToken();
+      if (!token || !meetingId) return;
+      await api.denyParticipant(meetingId, clerkId, token);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waitingRoom', meetingId] })
+  });
+
+  const { mutate: admitAllGuests } = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token || !meetingId) return;
+      await api.admitAllParticipants(meetingId, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['waitingRoom', meetingId] });
+      queryClient.invalidateQueries({ queryKey: ['meeting', id] });
+    }
+  });
+
+  const { mutate: toggleOpenForAll } = useMutation({
+    mutationFn: async (nextValue: boolean) => {
+      const token = await getToken();
+      if (!token || !meetingId) return;
+      await api.updateOpenForAll(meetingId, token, nextValue);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meeting', id] });
+      queryClient.invalidateQueries({ queryKey: ['waitingRoom', meetingId] });
+    }
+  });
+
   // Controls state
   const [showCaptionsPanel, setShowCaptionsPanel] = useState(false);
   const [showMicDevices, setShowMicDevices] = useState(false);
   const [showCamDevices, setShowCamDevices] = useState(false);
+  
+  const [showAdmitPopup, setShowAdmitPopup] = useState(false);
+  const admitPopupRef = useRef<HTMLDivElement | null>(null);
+
+  const [showSettingsPopup, setShowSettingsPopup] = useState(false);
+  const settingsPopupRef = useRef<HTMLDivElement | null>(null);
+
+  const [showEndCallPopup, setShowEndCallPopup] = useState(false);
+  const endCallPopupRef = useRef<HTMLDivElement | null>(null);
+  const hasNavigatedAwayRef = useRef(false);
+
+  useEffect(() => {
+    if (callingState === CallingState.LEFT && !hasNavigatedAwayRef.current) {
+      hasNavigatedAwayRef.current = true;
+      navigate(`/summary/${id || 'm1'}`);
+    }
+  }, [callingState, navigate, id]);
   
   const [captionsToast, setCaptionsToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const captionsToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -332,12 +560,21 @@ function MeetingRoomContent({
       if (showCamDevices && camPanelRef.current && !camPanelRef.current.contains(event.target as Node)) {
         setShowCamDevices(false);
       }
+      if (showEndCallPopup && endCallPopupRef.current && !endCallPopupRef.current.contains(event.target as Node)) {
+        setShowEndCallPopup(false);
+      }
+      if (showAdmitPopup && admitPopupRef.current && !admitPopupRef.current.contains(event.target as Node)) {
+        setShowAdmitPopup(false);
+      }
+      if (showSettingsPopup && settingsPopupRef.current && !settingsPopupRef.current.contains(event.target as Node)) {
+        setShowSettingsPopup(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showCaptionsPanel, showMicDevices, showCamDevices]);
+  }, [showCaptionsPanel, showMicDevices, showCamDevices, showEndCallPopup, showAdmitPopup, showSettingsPopup]);
 
   // tab sync effect
   useEffect(() => {
@@ -525,25 +762,57 @@ function MeetingRoomContent({
     }
   };
 
-  const handleEndCall = async () => {
+  const handleEndCallButtonClick = () => {
+    if (isHost) {
+      setShowEndCallPopup(prev => !prev);
+    } else {
+      handleLeaveMeeting();
+    }
+  };
+
+  const handleLeaveMeeting = async () => {
+    setShowEndCallPopup(false);
     try {
-      if (isHost && meetingId) {
+      if (call && call.state.callingState !== CallingState.LEFT) {
+        await call.leave();
+      }
+    } catch (err: any) {
+      if (!err.message?.includes('already been left')) {
+        console.error("Error leaving call", err);
+      }
+    }
+    // Navigation is handled by the callingState effect above — do not navigate here.
+  };
+
+  const handleEndForAll = async () => {
+    setShowEndCallPopup(false);
+    try {
+      if (meetingId) {
         const token = await getToken();
         if (token) {
           await api.endMeeting(meetingId, token);
         }
-      } else {
-        if (call && call.state.callingState !== CallingState.LEFT) {
-          await call.leave();
-        }
+      }
+    } catch (err) {
+      console.error("Failed to end meeting on backend", err);
+    }
+    try {
+      if (call) {
+        await call.endCall();
+      }
+    } catch (err) {
+      console.error("Failed to end call on Stream", err);
+    }
+    try {
+      if (call && call.state.callingState !== CallingState.LEFT) {
+        await call.leave();
       }
     } catch (err: any) {
       if (!err.message?.includes('already been left')) {
-        console.error("Error during end call", err);
+        console.error("Error leaving call after endCall", err);
       }
     }
-    
-    navigate(`/summary/${id || 'm1'}`);
+    // Navigation is handled by the callingState effect above — do not navigate here.
   };
 
   const attendeeMap = useMemo(() => {
@@ -592,6 +861,85 @@ function MeetingRoomContent({
           <span className="text-[#94A3B8] bg-[#1E293B] px-2 py-0.5 rounded text-[12px]">{formatElapsedTime(elapsedSeconds)}</span>
         </div>
         <div className="flex items-center gap-4">
+          {isHost && waitingRoomList.length > 0 && (
+            <div ref={admitPopupRef} className="relative">
+              <button
+                onClick={() => setShowAdmitPopup(prev => !prev)}
+                className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] transition-colors rounded-full px-4 py-2 text-white text-[13px] font-semibold"
+              >
+                {waitingRoomList.length === 1 ? 'Admit one guest' : `Admit ${waitingRoomList.length} guests`}
+              </button>
+
+              {showAdmitPopup && (
+                <div className="absolute top-full right-0 mt-2 w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-30 text-left">
+                  <div className="text-[13px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-3">In waiting room</div>
+
+                  {waitingRoomList.length === 1 ? (
+                    <>
+                      <div className="flex items-center justify-center gap-2 mb-4">
+                        <button
+                          onClick={() => admitGuest(waitingRoomList[0].clerkId)}
+                          className="flex-1 px-3 py-2 bg-[#4F46E5] text-white rounded-md text-[13px] font-medium hover:bg-[#4338CA] transition-colors"
+                        >
+                          Admit
+                        </button>
+                        <button
+                          onClick={() => denyGuest(waitingRoomList[0].clerkId)}
+                          className="flex-1 px-3 py-2 bg-[#334155] text-white rounded-md text-[13px] font-medium hover:bg-[#475569] transition-colors"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                      <div className="flex flex-col items-center gap-2 mb-4">
+                        {waitingRoomList[0].profileImage ? (
+                          <img src={waitingRoomList[0].profileImage} alt={waitingRoomList[0].name} className="w-12 h-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-bold" style={{ background: getAvatarColor(waitingRoomList[0].clerkId) }}>
+                            {getInitials(waitingRoomList[0].name)}
+                          </div>
+                        )}
+                        <span className="text-[13px] font-medium text-white">{waitingRoomList[0].name}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-[#0F172A] rounded-lg p-3 mb-3">
+                        <div className="text-[13px] text-white font-medium mb-2">{waitingRoomList.length} people waiting</div>
+                        <div className="text-[12px] text-[#94A3B8] mb-3 leading-relaxed">
+                          {waitingRoomList.slice(0, 3).map((w: any) => w.name).join(', ')}
+                          {waitingRoomList.length > 3 ? ` and ${waitingRoomList.length - 3} others` : ''}
+                        </div>
+                        <div className="flex -space-x-2">
+                          {waitingRoomList.slice(0, 6).map((w: any) => (
+                            w.profileImage ? (
+                              <img key={w.clerkId} src={w.profileImage} alt={w.name} className="w-8 h-8 rounded-full object-cover border-2 border-[#0F172A]" />
+                            ) : (
+                              <div key={w.clerkId} className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold border-2 border-[#0F172A]" style={{ background: getAvatarColor(w.clerkId) }}>
+                                {getInitials(w.name)}
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => admitAllGuests()}
+                        className="w-full px-3 py-2 bg-[#4F46E5] text-white rounded-md text-[13px] font-medium hover:bg-[#4338CA] transition-colors mb-2"
+                      >
+                        Admit all
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => { setShowAdmitPopup(false); setIsSidebarOpen(true); setShowParticipantPanel(true); }}
+                    className="w-full text-center text-[13px] text-[#4F46E5] font-medium hover:underline py-1"
+                  >
+                    View All ({waitingRoomList.length}) &rarr;
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <ParticipantPill 
             onClick={() => {
               if (isSidebarOpen && showParticipantPanel) {
@@ -669,7 +1017,15 @@ function MeetingRoomContent({
         >
           <div className="w-[340px] h-full bg-[#0F172A] flex flex-col border-l border-[#1E293B]">
             {showParticipantPanel ? (
-              <ParticipantListPanel onClose={() => setShowParticipantPanel(false)} hostClerkId={hostClerkId} />
+              <ParticipantListPanel 
+                onClose={() => setShowParticipantPanel(false)} 
+                hostClerkId={hostClerkId}
+                waitingRoom={waitingRoomList}
+                isHost={isHost}
+                onAdmit={admitGuest}
+                onDeny={denyGuest}
+                onAdmitAll={admitAllGuests}
+              />
             ) : (
               <>
                 {/* Tabs */}
@@ -910,12 +1266,62 @@ function MeetingRoomContent({
         <ReactionsButton />
 
         {/* End Call Button */}
-        <button 
-          onClick={handleEndCall}
-          className="w-16 h-12 rounded-full bg-[#EF4444] hover:bg-[#DC2626] flex items-center justify-center transition-colors ml-4 flex-shrink-0"
-        >
-          <PhoneOff size={20} className="text-white" />
-        </button>
+        <div ref={endCallPopupRef} className="relative ml-4 flex-shrink-0">
+          <button 
+            onClick={handleEndCallButtonClick}
+            className="w-16 h-12 rounded-full bg-[#EF4444] hover:bg-[#DC2626] flex items-center justify-center transition-colors"
+          >
+            <PhoneOff size={20} className="text-white" />
+          </button>
+
+          {showEndCallPopup && isHost && (
+            <div className="absolute bottom-[110%] left-1/2 -translate-x-1/2 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
+              <button
+                onClick={handleEndForAll}
+                className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-lg transition-colors mb-1.5"
+              >
+                End meeting for all
+              </button>
+              <button
+                onClick={handleLeaveMeeting}
+                className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-[#E2E8F0] hover:bg-[#334155] rounded-lg transition-colors"
+              >
+                Leave meeting
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Settings Toggle Button */}
+        {isHost && (
+          <div ref={settingsPopupRef} className="absolute right-[72px] top-1/2 -translate-y-1/2 z-20">
+            <button
+              onClick={() => setShowSettingsPopup(prev => !prev)}
+              className="w-10 h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors"
+              title="Meeting settings"
+            >
+              <Settings size={18} />
+            </button>
+
+            {showSettingsPopup && (
+              <div className="absolute bottom-full right-0 mb-2 w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-30 text-left">
+                <div className="text-[13px] font-semibold text-white mb-3">Meeting Settings</div>
+                <div className="flex items-center justify-between">
+                  <div className="pr-3">
+                    <div className="text-[13px] font-medium text-white">Make this meeting open for all</div>
+                    <div className="text-[11px] text-[#94A3B8] mt-0.5">Anyone with the link or code joins instantly, without waiting for admission</div>
+                  </div>
+                  <button
+                    onClick={() => toggleOpenForAll(!meeting?.openForAll)}
+                    className={`w-10 h-[22px] rounded-full relative transition-colors flex-shrink-0 ${meeting?.openForAll ? 'bg-[#4F46E5]' : 'bg-[#475569]'}`}
+                  >
+                    <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${meeting?.openForAll ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sidebar Toggle Button */}
         <button

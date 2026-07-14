@@ -62,8 +62,27 @@ export const handleStreamVideoWebhook = async (req, res) => {
         }
       }).filter(Boolean);
 
+      const transcriptSegments = lines.map(line => {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed && parsed.text) {
+            return {
+              speakerId: parsed.speaker_id || null,
+              text: parsed.text,
+              timestamp: session.transcriptionStartedAt && typeof parsed.start_ts === 'number'
+                ? new Date(session.transcriptionStartedAt.getTime() + parsed.start_ts)
+                : null
+            };
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean);
+
       const plainTextTranscript = transcriptParts.join('\n');
       session.transcript = plainTextTranscript;
+      session.transcriptSegments = transcriptSegments;
       await session.save();
 
       try {

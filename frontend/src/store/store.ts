@@ -39,7 +39,9 @@ export interface Meeting {
   callId?: string;
   hostClerkId?: string;
   joinCode?: string;
+  openForAll?: boolean;
   ratings?: { clerkId: string; rating: number | null; skipped: boolean; ratedAt?: string }[];
+  pendingInvitees?: Attendee[];
 }
 
 export interface Task {
@@ -51,8 +53,10 @@ export interface Task {
   due: string;
   sourceMeetingId?: string;
   sourceMeetingTitle?: string;
+  sourceActionItem?: string;
   description?: string;
   dueDate?: string | null;
+  comments?: { _id?: string; clerkId: string; text: string; createdAt: string }[];
 }
 
 
@@ -158,6 +162,9 @@ export const useTaskStore = create<TasksState>()(
 export interface Team {
   _id: string;
   name: string;
+  slackWebhookUrl?: string;
+  notionToken?: string;
+  notionPageId?: string;
 }
 
 interface TeamState {

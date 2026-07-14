@@ -256,6 +256,28 @@ const leaveTeam = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Left the team" });
 });
 
+const updateTeamIntegrations = asyncHandler(async (req, res) => {
+  const team = await Team.findById(req.params.id);
+  if (!team) {
+    res.status(404);
+    throw new Error("Team not found");
+  }
+
+  if (team.admin !== req.user.clerkId) {
+    res.status(403);
+    throw new Error("Only the team admin can update integrations");
+  }
+
+  const { slackWebhookUrl, notionToken, notionPageId } = req.body;
+
+  if (slackWebhookUrl !== undefined) team.slackWebhookUrl = slackWebhookUrl;
+  if (notionToken !== undefined) team.notionToken = notionToken;
+  if (notionPageId !== undefined) team.notionPageId = notionPageId;
+
+  await team.save();
+  res.status(200).json(team);
+});
+
 export { 
   createTeam, 
   getTeams, 
@@ -267,5 +289,6 @@ export {
   getMyInvites,
   acceptInvite,
   declineInvite,
-  leaveTeam
+  leaveTeam,
+  updateTeamIntegrations
 };

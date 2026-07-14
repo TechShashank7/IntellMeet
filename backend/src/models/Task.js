@@ -49,6 +49,13 @@ const taskSchema = new mongoose.Schema(
       ref: "Meeting",
       default: null,
     },
+    comments: [
+      {
+        clerkId: { type: String, required: true },
+        text: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      }
+    ]
   },
   { timestamps: true }
 );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth, useUser } from '@clerk/clerk-react';
@@ -10,7 +10,6 @@ import {
   Calendar, 
   Clock, 
   Users, 
-  Share2, 
   FileText, 
   CheckSquare,
   Sparkles,
@@ -34,11 +33,91 @@ export default function AISummary() {
   const [hasViewedInsights, setHasViewedInsights] = useState(false);
   const [hoveredStar, setHoveredStar] = useState<number | null>(null);
 
+  const [showLeftBanner, setShowLeftBanner] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(30);
+  const [downloading, setDownloading] = useState(false);
+
+  const [postingToSlack, setPostingToSlack] = useState(false);
+  const [slackMessage, setSlackMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const [syncingToNotion, setSyncingToNotion] = useState(false);
+  const [notionMessage, setNotionMessage] = useState<{ type: 'success' | 'error', text: string, url?: string } | null>(null);
+
+  const dismissLeftBanner = () => setShowLeftBanner(false);
+
+  const handleDownloadPdf = async () => {
+    if (!meeting || !id) return;
+    setDownloading(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('No token');
+      const safeTitle = (meeting.title || "meeting").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      await api.downloadMeetingSummaryPdf(id, token, safeTitle);
+    } catch (err) {
+      console.error('Failed to download PDF:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handlePostToSlack = async () => {
+    if (!id) return;
+    setPostingToSlack(true);
+    setSlackMessage(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('No token');
+      await api.shareMeetingToSlack(id, token);
+      setSlackMessage({ type: 'success', text: 'Posted!' });
+      setTimeout(() => setSlackMessage(null), 2000);
+    } catch (err: any) {
+      setSlackMessage({ type: 'error', text: err.message || 'Failed to post' });
+      setTimeout(() => setSlackMessage(null), 5000);
+    } finally {
+      setPostingToSlack(false);
+    }
+  };
+
+  const handleSyncToNotion = async () => {
+    if (!id) return;
+    setSyncingToNotion(true);
+    setNotionMessage(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('No token');
+      const res = await api.syncMeetingToNotion(id, token);
+      setNotionMessage({ type: 'success', text: 'Synced!', url: res.url });
+      setTimeout(() => setNotionMessage(null), 5000);
+    } catch (err: any) {
+      setNotionMessage({ type: 'error', text: err.message || 'Failed to sync' });
+      setTimeout(() => setNotionMessage(null), 5000);
+    } finally {
+      setSyncingToNotion(false);
+    }
+  };
+
   const { data: meeting, isLoading: loadingMeeting } = useQuery({
     queryKey: ['meeting', id],
     queryFn: async () => api.getMeeting(id || '', await getToken() || ''),
     enabled: !!id
   });
+
+  useEffect(() => {
+    if (meeting?.status === 'active') {
+      setShowLeftBanner(true);
+      setSecondsRemaining(30);
+    }
+  }, [meeting?.status, id]);
+
+  useEffect(() => {
+    if (!showLeftBanner) return;
+    if (secondsRemaining <= 0) {
+      setShowLeftBanner(false);
+      return;
+    }
+    const timer = setTimeout(() => setSecondsRemaining(s => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [showLeftBanner, secondsRemaining]);
 
   const { data: aiData, isLoading: loadingSummary } = useQuery({
     queryKey: ['aiSummary', id],
@@ -50,8 +129,14 @@ export default function AISummary() {
     }
   });
 
+  const { data: tasks } = useQuery({
+    queryKey: ['tasks', currentTeamId],
+    queryFn: async () => api.getTasks(currentTeamId || '', await getToken() || ''),
+    enabled: !!currentTeamId
+  });
+
   const { mutate: addTask } = useMutation({
-    mutationFn: async (taskData: { title: string; assignee?: string; dueDate?: string }) => 
+    mutationFn: async (taskData: { title: string; assignee?: string | null; dueDate?: string; sourceActionItem?: string; sourceMeetingId?: string }) => 
       api.addTask(currentTeamId || '', await getToken() || '', taskData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
@@ -70,12 +155,14 @@ export default function AISummary() {
   });
 
   const handleSyncToTasks = (item: any) => {
-    if (syncedItems.has(item.id) || !meeting) return;
+    if (syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) || !meeting) return;
     
     addTask({
       title: item.text,
-      assignee: item.assignee?.name || undefined,
-      dueDate: item.dueDate
+      assignee: item.assignee?.clerkId || null,
+      dueDate: item.dueDate,
+      sourceActionItem: item.id,
+      sourceMeetingId: id
     });
     
     setSyncedItems(prev => new Set(prev).add(item.id));
@@ -86,7 +173,7 @@ export default function AISummary() {
     return {
       ...item,
       id: item._id || item.id,
-      assignee: attendee || { name: 'Unassigned', initials: '?', color: '#9CA3AF' }
+      assignee: attendee || { name: 'Unassigned', initials: '?', color: '#9CA3AF', clerkId: null }
     };
   }) || [];
 
@@ -115,34 +202,63 @@ export default function AISummary() {
   if (!alreadyRated && !ratingSubmitted) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans">
-        <div className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative max-w-sm w-full text-center">
-          <button 
-            onClick={() => rateCall({ skipped: true })}
-            className="absolute top-4 right-4 text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
-          >
-            <X size={20} />
-          </button>
-          <h2 className="text-[20px] font-semibold text-[#111827] mb-2">How was your call?</h2>
-          <p className="text-[14px] text-[#6B7280] mb-8">Rate your meeting experience</p>
-          <div className="flex items-center justify-center gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
+        <div className="flex flex-col items-center max-w-sm w-full">
+          {showLeftBanner && (
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="relative w-9 h-9 mb-3">
+                <svg className="w-9 h-9 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#E5E7EB" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="15" fill="none" stroke="#4F46E5" strokeWidth="3"
+                    strokeDasharray={2 * Math.PI * 15}
+                    strokeDashoffset={2 * Math.PI * 15 * (1 - secondsRemaining / 30)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-[#4F46E5]">
+                  {secondsRemaining}
+                </span>
+              </div>
+              <h2 className="text-[18px] font-semibold text-[#111827] mb-1">You left the meeting</h2>
+              <p className="text-[13px] text-[#6B7280] mb-4">Want to go back?</p>
               <button
-                key={star}
-                onMouseEnter={() => setHoveredStar(star)}
-                onMouseLeave={() => setHoveredStar(null)}
-                onClick={() => rateCall({ rating: star })}
-                className={`p-1 transition-colors ${
-                  (hoveredStar !== null ? star <= hoveredStar : false) 
-                    ? 'text-[#4F46E5]' 
-                    : 'text-[#9CA3AF]'
-                }`}
+                onClick={() => navigate(`/meeting/${id}`)}
+                className="px-5 py-2 bg-[#4F46E5] text-white rounded-md font-medium hover:bg-[#4338CA] transition-colors text-[13px]"
               >
-                <Star 
-                  size={36} 
-                  className={(hoveredStar !== null ? star <= hoveredStar : false) ? 'fill-[#4F46E5]' : ''} 
-                />
+                Rejoin Meeting
               </button>
-            ))}
+            </div>
+          )}
+
+          <div className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative w-full text-center">
+            <button 
+              onClick={() => { dismissLeftBanner(); rateCall({ skipped: true }); }}
+              className="absolute top-4 right-4 text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-[20px] font-semibold text-[#111827] mb-2">How was your call?</h2>
+            <p className="text-[14px] text-[#6B7280] mb-8">Rate your meeting experience</p>
+            <div className="flex items-center justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onMouseEnter={() => setHoveredStar(star)}
+                  onMouseLeave={() => setHoveredStar(null)}
+                  onClick={() => { dismissLeftBanner(); rateCall({ rating: star }); }}
+                  className={`p-1 transition-colors ${
+                    (hoveredStar !== null ? star <= hoveredStar : false) 
+                      ? 'text-[#4F46E5]' 
+                      : 'text-[#9CA3AF]'
+                  }`}
+                >
+                  <Star 
+                    size={36} 
+                    className={(hoveredStar !== null ? star <= hoveredStar : false) ? 'fill-[#4F46E5]' : ''} 
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -195,9 +311,6 @@ export default function AISummary() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <button className="px-4 py-2 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2">
-               <Share2 size={16} /> Share
-             </button>
           </div>
         </div>
       </header>
@@ -248,12 +361,20 @@ export default function AISummary() {
                     <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
                     <div className="flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
                       <div className="flex items-center gap-1.5">
-                        <div 
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                          style={{ background: item.assignee.color }}
-                        >
-                          {item.assignee.initials}
-                        </div>
+                        {item.assignee.profileImage ? (
+                          <img 
+                            src={item.assignee.profileImage} 
+                            alt={item.assignee.name}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div 
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
+                            style={{ background: item.assignee.color }}
+                          >
+                            {item.assignee.initials}
+                          </div>
+                        )}
                         {item.assignee.name}
                       </div>
                       <span className="flex items-center gap-1">
@@ -263,10 +384,10 @@ export default function AISummary() {
                   </div>
                   <button 
                     onClick={() => handleSyncToTasks(item)}
-                    disabled={syncedItems.has(item.id)}
-                    className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors flex-shrink-0 ${syncedItems.has(item.id) ? 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed' : 'bg-[#EEF2FF] text-[#4F46E5] hover:bg-[#E0E7FF]'}`}
+                    disabled={syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id)}
+                    className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors flex-shrink-0 ${syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) ? 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed' : 'bg-[#EEF2FF] text-[#4F46E5] hover:bg-[#E0E7FF]'}`}
                   >
-                    {syncedItems.has(item.id) ? 'Synced' : 'Add to Tasks'}
+                    {syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) ? 'Synced' : 'Add to Tasks'}
                   </button>
                 </div>
               )) : (
@@ -298,30 +419,63 @@ export default function AISummary() {
           <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
             <h3 className="text-[14px] font-semibold text-[#111827] mb-3">Export & Sync</h3>
             <div className="space-y-2">
-              <button className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors">
+              <button 
+                onClick={handlePostToSlack}
+                disabled={postingToSlack}
+                className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-[#FDF2F8] flex items-center justify-center text-[#DB2777]">
                     <MessageCircle size={16} />
                   </div>
-                  <span className="text-[14px] font-medium text-[#374151]">Post to Slack</span>
+                  <span className="text-[14px] font-medium text-[#374151]">
+                    {postingToSlack ? 'Posting...' : slackMessage?.type === 'success' ? slackMessage.text : 'Post to Slack'}
+                  </span>
                 </div>
-                <ArrowRight size={16} className="text-[#9CA3AF]" />
+                {slackMessage?.type === 'error' && (
+                  <span className="text-xs text-red-500 max-w-[100px] truncate" title={slackMessage.text}>{slackMessage.text}</span>
+                )}
+                {(!slackMessage || slackMessage.type === 'success') && (
+                  <ArrowRight size={16} className="text-[#9CA3AF]" />
+                )}
               </button>
-              <button className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors">
+              <button 
+                onClick={handleSyncToNotion}
+                disabled={syncingToNotion}
+                className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-black flex items-center justify-center text-white">
                     <span className="font-serif font-bold text-[14px]">N</span>
                   </div>
-                  <span className="text-[14px] font-medium text-[#374151]">Sync to Notion</span>
+                  <span className="text-[14px] font-medium text-[#374151]">
+                    {syncingToNotion ? 'Syncing...' : notionMessage?.type === 'success' ? notionMessage.text : 'Sync to Notion'}
+                  </span>
                 </div>
-                <ArrowRight size={16} className="text-[#9CA3AF]" />
+                {notionMessage?.type === 'error' && (
+                  <span className="text-xs text-red-500 max-w-[100px] truncate" title={notionMessage.text}>{notionMessage.text}</span>
+                )}
+                {(!notionMessage || notionMessage.type === 'success') && (
+                  <ArrowRight size={16} className="text-[#9CA3AF]" />
+                )}
               </button>
-              <button className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors">
+              {notionMessage?.url && (
+                <a href={notionMessage.url} target="_blank" rel="noreferrer" className="block text-xs text-right text-[#4F46E5] hover:underline mt-1 mr-2">
+                  View Page in Notion
+                </a>
+              )}
+              <button 
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
                     <Download size={16} />
                   </div>
-                  <span className="text-[14px] font-medium text-[#374151]">Download PDF</span>
+                  <span className="text-[14px] font-medium text-[#374151]">
+                    {downloading ? 'Downloading...' : 'Download PDF'}
+                  </span>
                 </div>
               </button>
             </div>
@@ -332,12 +486,20 @@ export default function AISummary() {
              <div className="space-y-3">
                {meeting.attendees?.map((attendee: any, idx: number) => (
                  <div key={idx} className="flex items-center gap-3">
-                   <div 
-                     className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
-                     style={{ background: attendee.color }}
-                   >
-                     {attendee.initials}
-                   </div>
+                   {attendee.profileImage ? (
+                     <img 
+                       src={attendee.profileImage} 
+                       alt={attendee.name}
+                       className="w-8 h-8 rounded-full object-cover"
+                     />
+                   ) : (
+                     <div 
+                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
+                       style={{ background: attendee.color }}
+                     >
+                       {attendee.initials}
+                     </div>
+                   )}
                    <span className="text-[14px] text-[#374151]">{attendee.name}</span>
                  </div>
                ))}

@@ -27,7 +27,7 @@ const assertTeamMember = async (teamId, clerkId, res) => {
  */
 const createTask = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const { title, description = "", assignee = null, dueDate = null, priority = "medium" } = req.body;
+  const { title, description = "", assignee = null, dueDate = null, priority = "medium", sourceActionItem = null, sourceMeetingId = null } = req.body;
 
   await assertTeamMember(teamId, req.user.clerkId, res);
 
@@ -36,7 +36,7 @@ const createTask = asyncHandler(async (req, res) => {
     throw new Error("Task title is required");
   }
 
-  const task = await Task.create({ title, description, teamId, assignee, dueDate, priority });
+  const task = await Task.create({ title, description, teamId, assignee, dueDate, priority, sourceActionItem, sourceMeetingId });
   res.status(201).json(task);
 });
 
@@ -117,4 +117,34 @@ const deleteTask = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Task deleted" });
 });
 
-export { createTask, getTeamTasks, updateTask, deleteTask };
+/**
+ * POST /api/tasks/:id/comments
+ * body: { text }
+ */
+const addTaskComment = asyncHandler(async (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    res.status(400);
+    throw new Error("Comment text is required");
+  }
+
+  const task = await Task.findById(req.params.id);
+  if (!task) {
+    res.status(404);
+    throw new Error("Task not found");
+  }
+
+  await assertTeamMember(task.teamId, req.user.clerkId, res);
+
+  const comment = {
+    clerkId: req.user.clerkId,
+    text,
+  };
+
+  task.comments.push(comment);
+  await task.save();
+
+  res.status(201).json(task);
+});
+
+export { createTask, getTeamTasks, updateTask, deleteTask, addTaskComment };

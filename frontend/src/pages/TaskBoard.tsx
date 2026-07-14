@@ -10,8 +10,14 @@ import {
   Plus, 
   MoreHorizontal, 
   Calendar,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  Check,
+  MessageCircle,
+  X,
+  Send
 } from 'lucide-react';
+import { getInitials, getAvatarColor } from '../lib/utils';
 
 const COLUMNS = [
   { id: 'backlog', title: 'Backlog', color: '#6B7280' },
@@ -22,12 +28,15 @@ const COLUMNS = [
 
 export default function TaskBoard() {
   const queryClient = useQueryClient();
-  const { currentTeamId } = useTeamStore();
+  const { currentTeamId, teams, setCurrentTeamId } = useTeamStore();
   const { getToken } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
+  const currentTeam = useMemo(() => teams.find(t => t._id === currentTeamId), [teams, currentTeamId]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
@@ -39,6 +48,10 @@ export default function TaskBoard() {
 
   // Task detail modal states
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [isTaskMenuOpen, setIsTaskMenuOpen] = useState(false);
+  const [isCommentsView, setIsCommentsView] = useState(false);
+  const [newCommentText, setNewCommentText] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
@@ -63,18 +76,37 @@ export default function TaskBoard() {
   const { mutate: updateStatus } = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: Task['status'] }) => 
       api.updateTaskStatus(id, status, await getToken() || ''),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', currentTeamId] });
+      const previousTasks = queryClient.getQueryData<Task[]>(['tasks', currentTeamId]);
+      
+      if (previousTasks) {
+        queryClient.setQueryData<Task[]>(['tasks', currentTeamId], old => 
+          old ? old.map(task => 
+            task.id === id ? { ...task, status } : task
+          ) : []
+        );
+      }
+      return { previousTasks };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['tasks', currentTeamId], context.previousTasks);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
     }
   });
 
   const { mutate: addTask } = useMutation({
-    mutationFn: async (taskData: { title: string; assignee?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => 
+    mutationFn: async (taskData: { title: string; description?: string; assignee?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => 
       api.addTask(currentTeamId || '', await getToken() || '', taskData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
       setIsModalOpen(false);
       setNewTaskTitle('');
+      setNewTaskDescription('');
       setNewTaskAssignee('');
       setNewTaskDue('');
       setNewTaskPriority('medium');
@@ -99,11 +131,22 @@ export default function TaskBoard() {
     }
   });
 
+  const { mutate: addComment } = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) => 
+      api.addTaskComment(id, text, await getToken() || ''),
+    onSuccess: (updatedTask) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
+      setSelectedTask(updatedTask);
+      setNewCommentText('');
+    }
+  });
+
   const handleAddTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     addTask({ 
       title: newTaskTitle, 
+      description: newTaskDescription,
       assignee: newTaskAssignee || undefined, 
       dueDate: newTaskDue || undefined, 
       priority: newTaskPriority 
@@ -127,13 +170,14 @@ export default function TaskBoard() {
 
   const handleDeleteTask = () => {
     if (!selectedTask) return;
-    if (window.confirm("Are you sure you want to delete this task?")) {
-      deleteTask(selectedTask.id);
-    }
+    deleteTask(selectedTask.id);
   };
 
   const handleOpenDetailModal = (task: Task) => {
     setSelectedTask(task);
+    setIsEditingTask(false);
+    setIsTaskMenuOpen(false);
+    setIsCommentsView(false);
     setEditTitle(task.title);
     setEditDescription(task.description || '');
     setEditAssignee(task.assignee?.clerkId || '');
@@ -227,8 +271,8 @@ export default function TaskBoard() {
     <div className="flex flex-col h-full bg-[#FAFAFA] font-sans">
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-[400px] p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white rounded-xl shadow-lg w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-[#111827] mb-4">Add Task</h2>
             <form onSubmit={handleAddTaskSubmit} className="space-y-4">
               <div>
@@ -239,6 +283,16 @@ export default function TaskBoard() {
                   onChange={e => setNewTaskTitle(e.target.value)}
                   className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">Description</label>
+                <textarea 
+                  value={newTaskDescription}
+                  onChange={e => setNewTaskDescription(e.target.value)}
+                  rows={3}
+                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
+                  placeholder="Add a detailed description..."
                 />
               </div>
               <div>
@@ -306,6 +360,47 @@ export default function TaskBoard() {
           <p className="text-[#6B7280] text-[14px] mt-1">Manage and track follow-ups from your meetings.</p>
         </div>
         <div className="flex items-center gap-4">
+          {teams.length > 0 && (
+            <div className="relative inline-block z-10">
+              <button
+                onClick={() => setIsTeamDropdownOpen(!isTeamDropdownOpen)}
+                className="flex items-center gap-2 bg-white border border-[#E5E7EB] rounded-[8px] px-3 py-2 shadow-sm hover:border-[#D1D5DB] transition-colors min-w-[160px] max-w-[220px]"
+              >
+                <div
+                  className="w-5 h-5 rounded-[4px] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                  style={{ background: getAvatarColor(currentTeam?._id || '') }}
+                >
+                  {getInitials(currentTeam?.name)}
+                </div>
+                <span className="text-[13px] font-[500] text-[#111827] flex-1 text-left truncate">{currentTeam?.name || 'Select a team'}</span>
+                <ChevronDown size={14} className={`text-[#9CA3AF] transition-transform ${isTeamDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isTeamDropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-full min-w-[200px] bg-white border border-[#E5E7EB] rounded-[8px] shadow-lg py-1.5 max-h-[280px] overflow-y-auto">
+                  {teams.map((team) => (
+                    <button
+                      key={team._id}
+                      onClick={() => {
+                        setCurrentTeamId(team._id);
+                        setIsTeamDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${team._id === currentTeamId ? 'bg-[#EEF2FF]' : 'hover:bg-[#F9FAFB]'}`}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-[4px] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                        style={{ background: getAvatarColor(team._id) }}
+                      >
+                        {getInitials(team.name)}
+                      </div>
+                      <span className="text-[13px] font-[500] text-[#111827] flex-1 truncate">{team.name}</span>
+                      {team._id === currentTeamId && <Check size={14} className="text-[#4F46E5] flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input 
@@ -396,15 +491,15 @@ export default function TaskBoard() {
           Loading tasks...
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto p-8">
-          <div className="flex gap-6 h-full min-w-max">
+        <div className="flex-1 overflow-hidden p-8">
+          <div className="grid grid-cols-4 gap-6 h-full">
             {COLUMNS.map((col) => {
               const columnTasks = filteredTasks.filter(t => t.status === col.id);
               
               return (
                 <div 
                   key={col.id} 
-                  className="w-[320px] flex flex-col h-full rounded-xl transition-colors border border-transparent"
+                  className="flex flex-col h-full rounded-xl transition-colors border border-transparent min-w-0"
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, col.id as Task['status'])}
@@ -437,10 +532,17 @@ export default function TaskBoard() {
                         className="bg-white p-4 rounded-lg border border-[#E5E7EB] shadow-sm cursor-grab active:cursor-grabbing hover:border-[#D1D5DB] transition-colors"
                       >
                         <div className="flex items-start justify-between mb-2 gap-4">
-                          <h3 className="text-[14px] font-medium text-[#111827] leading-tight">
-                            {task.title}
-                          </h3>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-[14px] font-medium text-[#111827] leading-tight">
+                              {task.title}
+                            </h3>
+                            {task.description && (
+                              <p className="mt-1.5 text-[12px] text-[#6B7280] line-clamp-3 leading-relaxed">
+                                {task.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
                             {task.priority && (
                               <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
                                 task.priority === 'high' ? 'bg-red-50 text-red-600 border border-red-100' :
@@ -467,12 +569,26 @@ export default function TaskBoard() {
                             <Calendar size={13} className="text-[#9CA3AF]" />
                             {task.due}
                           </div>
-                          <div 
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shadow-sm"
-                            style={{ background: task.assignee.color }}
-                            title={task.assignee.name}
-                          >
-                            {task.assignee.initials}
+                          <div className="flex items-center gap-1.5">
+                            {task.assignee.profileImage ? (
+                              <img 
+                                src={task.assignee.profileImage} 
+                                alt={task.assignee.name}
+                                title={task.assignee.name}
+                                className="w-6 h-6 rounded-full object-cover shadow-sm"
+                              />
+                            ) : (
+                              <div 
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shadow-sm"
+                                style={{ background: task.assignee.color }}
+                                title={task.assignee.name}
+                              >
+                                {task.assignee.initials}
+                              </div>
+                            )}
+                            <span className="text-[11.5px] font-medium text-[#4B5563] max-w-[90px] truncate" title={task.assignee.name}>
+                              {task.assignee.name}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -493,93 +609,250 @@ export default function TaskBoard() {
 
       {/* Detail Modal */}
       {selectedTask && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-[450px] p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
-              <h2 className="text-lg font-bold text-[#111827]">Task Details</h2>
-              <button 
-                type="button"
-                onClick={handleDeleteTask}
-                className="text-xs font-semibold text-[#EF4444] hover:bg-[#FEF2F2] px-2.5 py-1.5 rounded transition-colors"
-              >
-                Delete Task
-              </button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedTask(null)}>
+          <div className="bg-white rounded-xl shadow-lg w-[450px] p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {isCommentsView ? (
+              <div className="flex flex-col h-[450px]">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
+                  <h2 className="text-lg font-bold text-[#111827]">Comments</h2>
+                  <button 
+                    type="button"
+                    onClick={() => setIsCommentsView(false)}
+                    className="p-1.5 text-[#6B7280] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+                  {selectedTask.comments?.map((comment: any) => {
+                    const member = teamMembers.find((m: any) => m.clerkId === comment.clerkId);
+                    return (
+                      <div key={comment._id || comment.createdAt} className="flex gap-3">
+                        {member?.profileImage ? (
+                          <img src={member.profileImage} alt={member.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-[#E5E7EB]" />
+                        ) : (
+                          <div 
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-sm flex-shrink-0"
+                            style={{ background: getAvatarColor(comment.clerkId) }}
+                          >
+                            {getInitials(member?.name || 'Unknown User')}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 mb-0.5">
+                            <span className="text-[13px] font-semibold text-[#111827] truncate">{member?.name || 'Unknown User'}</span>
+                            <span className="text-[11px] text-[#6B7280] flex-shrink-0">
+                              {new Date(comment.createdAt).toLocaleDateString()} at {new Date(comment.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          </div>
+                          <p className="text-[13px] text-[#374151] whitespace-pre-wrap break-words">{comment.text}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(!selectedTask.comments || selectedTask.comments.length === 0) && (
+                    <div className="text-center text-[#6B7280] text-[13px] italic mt-4">
+                      No comments yet. Be the first to comment!
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 items-end border-t border-[#F3F4F6] pt-4 mt-auto">
+                  <textarea
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (newCommentText.trim()) {
+                          addComment({ id: selectedTask.id, text: newCommentText });
+                        }
+                      }
+                    }}
+                    placeholder="Write a comment..."
+                    className="flex-1 border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white min-h-[40px] max-h-[120px]"
+                    rows={1}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!newCommentText.trim()) return;
+                      addComment({ id: selectedTask.id, text: newCommentText });
+                    }}
+                    disabled={!newCommentText.trim()}
+                    className="p-2.5 bg-[#4F46E5] text-white rounded-md hover:bg-[#4338CA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-0.5"
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
+                  <h2 className="text-lg font-bold text-[#111827]">Task Details</h2>
+                  <div className="relative">
+                    <button 
+                      type="button"
+                      onClick={() => setIsTaskMenuOpen(!isTaskMenuOpen)}
+                      className="p-1.5 text-[#6B7280] hover:bg-[#F3F4F6] rounded-md transition-colors"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                {isTaskMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-36 bg-white border border-[#E5E7EB] rounded-lg shadow-lg py-1 z-10">
+                    {!isEditingTask && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingTask(true);
+                          setIsTaskMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F9FAFB]"
+                      >
+                        Edit Task
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteTask();
+                        setIsTaskMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] text-[#EF4444] hover:bg-[#FEF2F2]"
+                    >
+                      Delete Task
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <form onSubmit={handleSaveEdit} className="space-y-4">
               <div>
                 <label className="block text-[13px] font-medium text-[#374151] mb-1">Title *</label>
-                <input 
-                  type="text" 
-                  value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
-                  required
-                />
+                {isEditingTask ? (
+                  <input 
+                    type="text" 
+                    value={editTitle}
+                    onChange={e => setEditTitle(e.target.value)}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                    required
+                  />
+                ) : (
+                  <div className="text-[14px] text-[#111827]">{editTitle}</div>
+                )}
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-[#374151] mb-1">Description</label>
-                <textarea 
-                  value={editDescription}
-                  onChange={e => setEditDescription(e.target.value)}
-                  rows={3}
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
-                  placeholder="Add a detailed description..."
-                />
+                {isEditingTask ? (
+                  <textarea 
+                    value={editDescription}
+                    onChange={e => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
+                    placeholder="Add a detailed description..."
+                  />
+                ) : (
+                  <div className="text-[13px] text-[#4B5563] whitespace-pre-wrap">{editDescription || 'No description provided.'}</div>
+                )}
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee</label>
-                <select 
-                  value={editAssignee}
-                  onChange={e => setEditAssignee(e.target.value)}
-                  className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                >
-                  <option value="">Unassigned</option>
-                  {teamMembers.map((member: any) => (
-                    <option key={member.clerkId} value={member.clerkId}>
-                      {member.name}
-                    </option>
-                  ))}
-                </select>
+                {isEditingTask ? (
+                  <select 
+                    value={editAssignee}
+                    onChange={e => setEditAssignee(e.target.value)}
+                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((member: any) => (
+                      <option key={member.clerkId} value={member.clerkId}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-[13px] text-[#111827]">
+                    {editAssignee ? teamMembers.find((m: any) => m.clerkId === editAssignee)?.name : 'Unassigned'}
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date</label>
-                  <input 
-                    type="date" 
-                    value={editDueDate}
-                    onChange={e => setEditDueDate(e.target.value)}
-                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                  />
+                  {isEditingTask ? (
+                    <input 
+                      type="date" 
+                      value={editDueDate}
+                      onChange={e => setEditDueDate(e.target.value)}
+                      className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                    />
+                  ) : (
+                    <div className="text-[13px] text-[#111827]">{editDueDate || 'No due date'}</div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-[#374151] mb-1">Priority</label>
-                  <select 
-                    value={editPriority}
-                    onChange={e => setEditPriority(e.target.value)}
-                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
+                  {isEditingTask ? (
+                    <select 
+                      value={editPriority}
+                      onChange={e => setEditPriority(e.target.value)}
+                      className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  ) : (
+                    <div className="text-[13px] text-[#111827] capitalize">{editPriority}</div>
+                  )}
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F3F4F6]">
-                <button 
-                  type="button" 
-                  onClick={() => setSelectedTask(null)}
-                  className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
-                >
-                  Save Changes
-                </button>
-              </div>
+              {isEditingTask && (
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F3F4F6]">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setIsEditingTask(false);
+                      setEditTitle(selectedTask.title);
+                      setEditDescription(selectedTask.description || '');
+                      setEditAssignee(selectedTask.assignee?.clerkId || '');
+                      let formattedDate = '';
+                      if (selectedTask.dueDate) {
+                        formattedDate = new Date(selectedTask.dueDate).toISOString().split('T')[0];
+                      }
+                      setEditDueDate(formattedDate);
+                      setEditPriority(selectedTask.priority || 'medium');
+                    }}
+                    className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              )}
+              {!isEditingTask && (
+                <div className="flex justify-end mt-6 pt-4 border-t border-[#F3F4F6]">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsCommentsView(true)}
+                    className="relative p-2 text-[#6B7280] hover:bg-[#F3F4F6] rounded-full transition-colors"
+                    title="Comments"
+                  >
+                    <MessageCircle size={22} />
+                    {selectedTask.comments && selectedTask.comments.length > 0 && (
+                      <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 bg-[#EF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white leading-none">
+                        {selectedTask.comments.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
             </form>
+            </>
+          )}
           </div>
         </div>
       )}

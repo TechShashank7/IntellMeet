@@ -84,14 +84,19 @@ const getSessionSummary = asyncHandler(async (req, res) => {
     throw new Error("Session not found");
   }
 
-  // Fallback: If pending and meeting is completed, try to fetch from Stream
-  if (session.aiProcessingStatus === "pending" && session.status === "completed") {
-    // Try to get a lock atomically
-    const lockedSession = await Session.findOneAndUpdate(
-      { _id: session._id, aiProcessingStatus: "pending" },
-      { $set: { aiProcessingStatus: "processing" } },
-      { new: true }
-    );
+  // Fallback: If pending, or stuck in processing without a transcript (from a previous timeout)
+  if ((session.aiProcessingStatus === "pending" || (session.aiProcessingStatus === "processing" && !session.transcript)) && session.status === "completed") {
+    // Try to get a lock atomically (only if pending, if already processing we just continue but the lock won't trigger if multiple hit this branch at once)
+    let lockedSession;
+    if (session.aiProcessingStatus === "pending") {
+      lockedSession = await Session.findOneAndUpdate(
+        { _id: session._id, aiProcessingStatus: "pending" },
+        { $set: { aiProcessingStatus: "processing" } },
+        { new: true }
+      );
+    } else {
+      lockedSession = session; // Already processing but stuck, let's take over
+    }
 
     if (lockedSession) {
       session = lockedSession; // we got the lock
@@ -145,11 +150,17 @@ const getSessionSummary = asyncHandler(async (req, res) => {
         }
         
         if (session.transcript && session.transcript.trim().length > 0) {
-          // Trigger summarization asynchronously so we don't block the frontend polling
-          summarizeAndPersist(session._id).catch(err => {
+          // AWAIT the summarization so Vercel does not kill the lambda
+          try {
+            await summarizeAndPersist(session._id);
+            // Re-fetch the completed session with action items populated
+            const completedSession = await Session.findById(session._id).populate("actionItems");
+            if (completedSession) session = completedSession;
+          } catch (err) {
             console.error("AI Fallback processing failed:", err);
-            Session.findByIdAndUpdate(session._id, { $set: { aiProcessingStatus: "failed" } }).catch(console.error);
-          });
+            await Session.findByIdAndUpdate(session._id, { $set: { aiProcessingStatus: "failed" } });
+            session.aiProcessingStatus = "failed";
+          }
         } else {
           // Transcript not ready yet on Stream's side. Revert to 'pending' for next poll
           session.aiProcessingStatus = "pending";

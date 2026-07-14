@@ -1038,7 +1038,11 @@ export async function exportMeetingNotes(req, res) {
   try {
     const { id } = req.params;
     const { type } = req.query;
-    const session = await Session.findById(id)
+    let query = { callId: id };
+    if (id && id.length === 24) {
+      query = { $or: [{ _id: id }, { callId: id }] };
+    }
+    const session = await Session.findOne(query)
       .populate("host", "name clerkId")
       .populate("actionItems");
 
@@ -1174,7 +1178,11 @@ export async function exportMeetingNotes(req, res) {
 export async function shareMeetingToSlack(req, res) {
   try {
     const { id } = req.params;
-    const session = await Session.findById(id).populate("actionItems").lean();
+    let query = { callId: id };
+    if (id && id.length === 24) {
+      query = { $or: [{ _id: id }, { callId: id }] };
+    }
+    const session = await Session.findOne(query).populate("actionItems").lean();
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     if (!isSessionMember(session, req)) {
@@ -1214,7 +1222,11 @@ export async function shareMeetingToSlack(req, res) {
 export async function syncMeetingToNotion(req, res) {
   try {
     const { id } = req.params;
-    const session = await Session.findById(id).populate("actionItems").lean();
+    let query = { callId: id };
+    if (id && id.length === 24) {
+      query = { $or: [{ _id: id }, { callId: id }] };
+    }
+    const session = await Session.findOne(query).populate("actionItems").lean();
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     if (!isSessionMember(session, req)) {

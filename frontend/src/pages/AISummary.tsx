@@ -53,8 +53,9 @@ export default function AISummary() {
       if (!token) throw new Error('No token');
       const safeTitle = (meeting.title || "meeting").replace(/[^a-z0-9]/gi, "_").toLowerCase();
       await api.downloadMeetingSummaryPdf(id, token, safeTitle);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to download PDF:', err);
+      window.alert(err.message || 'Failed to download PDF');
     } finally {
       setDownloading(false);
     }
@@ -71,7 +72,9 @@ export default function AISummary() {
       setSlackMessage({ type: 'success', text: 'Posted!' });
       setTimeout(() => setSlackMessage(null), 2000);
     } catch (err: any) {
-      setSlackMessage({ type: 'error', text: err.message || 'Failed to post' });
+      const errorMsg = err.message || 'Failed to post';
+      setSlackMessage({ type: 'error', text: errorMsg });
+      window.alert(errorMsg);
       setTimeout(() => setSlackMessage(null), 5000);
     } finally {
       setPostingToSlack(false);
@@ -89,7 +92,9 @@ export default function AISummary() {
       setNotionMessage({ type: 'success', text: 'Synced!', url: res.url });
       setTimeout(() => setNotionMessage(null), 5000);
     } catch (err: any) {
-      setNotionMessage({ type: 'error', text: err.message || 'Failed to sync' });
+      const errorMsg = err.message || 'Failed to sync';
+      setNotionMessage({ type: 'error', text: errorMsg });
+      window.alert(errorMsg);
       setTimeout(() => setNotionMessage(null), 5000);
     } finally {
       setSyncingToNotion(false);

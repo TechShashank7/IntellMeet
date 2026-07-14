@@ -2,7 +2,8 @@ import asyncHandler from "express-async-handler";
 import Session from "../models/Session.js";
 import ActionItem from "../models/ActionItem.js";
 import Task from "../models/Task.js";
-import { generateMeetingSummary } from "../services/ai.service.js";
+import { generateMeetingSummary, summarizeAndPersist } from "../services/ai.service.js";
+import { streamClient } from "../lib/stream.js";
 
 /**
  * POST /api/ai/summarize/:meetingId
@@ -81,6 +82,96 @@ const getSessionSummary = asyncHandler(async (req, res) => {
   if (!session) {
     res.status(404);
     throw new Error("Session not found");
+  }
+
+  // Fallback: If pending and meeting is completed, try to fetch from Stream
+  if (session.aiProcessingStatus === "pending" && session.status === "completed") {
+    // Try to get a lock atomically
+    const lockedSession = await Session.findOneAndUpdate(
+      { _id: session._id, aiProcessingStatus: "pending" },
+      { $set: { aiProcessingStatus: "processing" } },
+      { new: true }
+    );
+
+    if (lockedSession) {
+      session = lockedSession; // we got the lock
+      try {
+        if (!session.transcript || session.transcript.trim().length === 0) {
+          const call = streamClient.video.call("default", session.callId);
+          const transcriptionsResult = await call.listTranscriptions();
+          const transcriptions = transcriptionsResult.transcriptions || [];
+          
+          if (transcriptions.length > 0) {
+            const readyTranscription = transcriptions.find(t => t.url);
+            if (readyTranscription) {
+              const response = await fetch(readyTranscription.url);
+              if (response.ok) {
+                const rawText = await response.text();
+                const lines = rawText.split('\n').filter(line => line.trim() !== '');
+                
+                const transcriptParts = lines.map(line => {
+                  try {
+                    const parsed = JSON.parse(line);
+                    return `${parsed.speaker_id || 'Unknown'}: ${parsed.text}`;
+                  } catch (e) {
+                    return null;
+                  }
+                }).filter(Boolean);
+
+                const transcriptSegments = lines.map(line => {
+                  try {
+                    const parsed = JSON.parse(line);
+                    if (parsed && parsed.text) {
+                      return {
+                        speakerId: parsed.speaker_id || null,
+                        text: parsed.text,
+                        timestamp: session.transcriptionStartedAt && typeof parsed.start_ts === 'number'
+                          ? new Date(session.transcriptionStartedAt.getTime() + parsed.start_ts)
+                          : null
+                      };
+                    }
+                    return null;
+                  } catch (e) {
+                    return null;
+                  }
+                }).filter(Boolean);
+
+                session.transcript = transcriptParts.join('\n');
+                session.transcriptSegments = transcriptSegments;
+                await session.save();
+              }
+            }
+          }
+        }
+        
+        if (session.transcript && session.transcript.trim().length > 0) {
+          // Trigger summarization asynchronously so we don't block the frontend polling
+          summarizeAndPersist(session._id).catch(err => {
+            console.error("AI Fallback processing failed:", err);
+            Session.findByIdAndUpdate(session._id, { $set: { aiProcessingStatus: "failed" } }).catch(console.error);
+          });
+        } else {
+          // Transcript not ready yet on Stream's side. Revert to 'pending' for next poll
+          session.aiProcessingStatus = "pending";
+          await session.save();
+        }
+      } catch (err) {
+        console.error("Error in fallback transcription check:", err);
+        session.aiProcessingStatus = "pending";
+        await session.save();
+      }
+    } else {
+      // Another request got the lock and is currently processing.
+      session.aiProcessingStatus = "processing";
+    }
+  }
+
+  // Populate actionItems if they weren't populated in lockedSession or if just finished
+  if (session.aiProcessingStatus === "completed" && session.actionItems && session.actionItems.length > 0) {
+    if (!session.actionItems[0].text) {
+       const popSession = await Session.findById(session._id).populate("actionItems");
+       if (popSession) session = popSession;
+    }
   }
 
   res.status(200).json({

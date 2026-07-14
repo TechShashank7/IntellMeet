@@ -1137,30 +1137,30 @@ export async function exportMeetingNotes(req, res) {
       doc.moveDown(1);
 
       doc.moveDown(1);
+    }
 
-      // --- Transcript ---
-      doc.addPage();
-      doc.fontSize(14).text("Transcript", { underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(10);
+    // --- Transcript ---
+    doc.addPage();
+    doc.fontSize(14).text("Transcript", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10);
 
-      if (session.transcriptSegments && session.transcriptSegments.length > 0) {
-        session.transcriptSegments.forEach((seg) => {
-          const speakerName = seg.speakerId ? (nameMap[seg.speakerId] || "Unknown speaker") : "Unknown speaker";
-          const time = formatTime(seg.timestamp);
-          doc.fillColor("#4F46E5").text(`${speakerName}${time ? "  ·  " + time : ""}`, { continued: false });
-          doc.fillColor("#111827").text(seg.text);
-          doc.moveDown(0.5);
-        });
-      } else if (session.transcript && session.transcript.trim().length > 0) {
-        doc.fillColor("#6B7280").text(
-          "(Detailed speaker/timestamp breakdown not available for this meeting — showing raw transcript.)"
-        );
+    if (session.transcriptSegments && session.transcriptSegments.length > 0) {
+      session.transcriptSegments.forEach((seg) => {
+        const speakerName = seg.speakerId ? (nameMap[seg.speakerId] || "Unknown speaker") : "Unknown speaker";
+        const time = formatTime(seg.timestamp);
+        doc.fillColor("#4F46E5").text(`${speakerName}${time ? "  ·  " + time : ""}`, { continued: false });
+        doc.fillColor("#111827").text(seg.text);
         doc.moveDown(0.5);
-        doc.fillColor("#111827").text(session.transcript);
-      } else {
-        doc.fillColor("#6B7280").text("No transcript available for this meeting.");
-      }
+      });
+    } else if (session.transcript && session.transcript.trim().length > 0) {
+      doc.fillColor("#6B7280").text(
+        "(Detailed speaker/timestamp breakdown not available for this meeting — showing raw transcript.)"
+      );
+      doc.moveDown(0.5);
+      doc.fillColor("#111827").text(session.transcript);
+    } else {
+      doc.fillColor("#6B7280").text("No transcript available for this meeting.");
     }
 
     // Wait for the stream to finish before ending the Vercel function

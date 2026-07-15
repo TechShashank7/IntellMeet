@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuth } from '@clerk/clerk-react';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
-import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import MeetingRoom from './pages/MeetingRoom';
 import AISummary from './pages/AISummary';
@@ -23,11 +22,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const RootRedirect = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  
+  if (!isLoaded) return null;
+
+  return isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+};
+
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/login/*" element={<SignInPage />} />
         <Route path="/signup/*" element={<SignUpPage />} />
         

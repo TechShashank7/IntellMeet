@@ -60,8 +60,8 @@ export default function RecordingDetail() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans">
       <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-10 px-8 py-4">
-        <div className="max-w-none w-full px-2 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-none w-full px-2 flex items-start md:items-center justify-between gap-3 md:gap-0">
+          <div className="flex items-start md:items-center gap-4">
             <button 
               onClick={() => navigate('/dashboard?tab=recordings')}
               className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-full transition-colors"
@@ -72,15 +72,15 @@ export default function RecordingDetail() {
               <div className="flex items-center gap-3">
                 <h1 className="text-[20px] font-bold text-[#111827]">{session.topic || 'Untitled Meeting'}</h1>
               </div>
-              <div className="flex items-center gap-4 mt-1 text-[13px] text-[#6B7280]">
-                <span className="flex items-center gap-1.5"><Calendar size={14} /> {session.startTime ? format(new Date(session.startTime), 'MMM d, yyyy') : 'Unknown date'}</span>
-                <span className="flex items-center gap-1.5"><Clock size={14} /> {formatDurationSeconds(session.recordingDurationSeconds || 0)}</span>
-                <span className="flex items-center gap-1.5"><Users size={14} /> {participants?.length || 0} Attendees</span>
+              <div className="flex items-center flex-wrap gap-4 mt-1 text-[13px] text-[#6B7280]">
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Calendar size={14} /> {session.startTime ? format(new Date(session.startTime), 'MMM d, yyyy') : 'Unknown date'}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Clock size={14} /> {formatDurationSeconds(session.recordingDurationSeconds || 0)}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Users size={14} /> {participants?.length || 0} Attendees</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <span className="text-[13px] font-medium text-[#374151]">
+             <span className="text-[13px] font-medium text-[#374151] hidden md:inline">
                Download notes and transcript
              </span>
              <button 

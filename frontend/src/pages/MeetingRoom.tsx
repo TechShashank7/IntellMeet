@@ -61,7 +61,8 @@ import {
   MonitorUp,
   PhoneOff,
   ChevronUp,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 
 // Global timeout to prevent Stream SDK from tearing down during React Strict Mode double-invocations
@@ -532,6 +533,45 @@ function MeetingRoomContent({
   const [linkCopied, setLinkCopied] = useState(false);
   const meetingReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const hasOpenPopups = showCaptionsPanel || showMicDevices || showCamDevices || showAdmitPopup || showSettingsPopup || showEndCallPopup || isSidebarOpen;
+
+    const resetControlsTimeout = () => {
+      setControlsVisible(true);
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      
+      if (hasOpenPopups) return;
+      
+      controlsTimeoutRef.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 5000);
+    };
+
+    resetControlsTimeout();
+
+    const handleTouch = () => resetControlsTimeout();
+    document.addEventListener('touchstart', handleTouch);
+    document.addEventListener('mousemove', handleTouch);
+    
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      document.removeEventListener('touchstart', handleTouch);
+      document.removeEventListener('mousemove', handleTouch);
+    };
+  }, [isMobile, showCaptionsPanel, showMicDevices, showCamDevices, showAdmitPopup, showSettingsPopup, showEndCallPopup, isSidebarOpen]);
+
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -841,10 +881,10 @@ function MeetingRoomContent({
         </div>
       )}
       {/* Top Bar */}
-      <div className="h-14 flex items-center justify-between px-4 text-white border-b border-[#1E293B] flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#EF4444] w-2 h-2 rounded-full animate-pulse" />
-          <span className="font-medium text-[14px]">{meeting?.title || 'Meeting Room'}</span>
+      <div className={`h-14 flex items-center justify-between px-4 text-white border-b border-[#1E293B] flex-shrink-0 bg-[#0F172A] md:relative absolute top-0 w-full z-20 transition-transform duration-300 ${!isMobile || controlsVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="flex items-center gap-3 min-w-0 pr-2">
+          <div className="bg-[#EF4444] w-2 h-2 rounded-full animate-pulse flex-shrink-0" />
+          <span className="font-medium text-[14px] truncate">{meeting?.title || 'Meeting Room'}</span>
           {isHost && (
             <button
               onClick={() => {
@@ -852,26 +892,32 @@ function MeetingRoomContent({
                 if (meetingReadyTimeoutRef.current) clearTimeout(meetingReadyTimeoutRef.current);
                 meetingReadyTimeoutRef.current = setTimeout(() => setShowMeetingReadyCard(false), 10000);
               }}
-              className="text-[#94A3B8] hover:text-white transition-colors"
+              className="text-[#94A3B8] hover:text-white transition-colors flex-shrink-0"
               title="Meeting info"
             >
               <Info size={16} />
             </button>
           )}
-          <span className="text-[#94A3B8] bg-[#1E293B] px-2 py-0.5 rounded text-[12px]">{formatElapsedTime(elapsedSeconds)}</span>
+          <span className="text-[#94A3B8] bg-[#1E293B] px-2 py-0.5 rounded text-[12px] flex-shrink-0">{formatElapsedTime(elapsedSeconds)}</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
           {isHost && waitingRoomList.length > 0 && (
             <div ref={admitPopupRef} className="relative">
               <button
                 onClick={() => setShowAdmitPopup(prev => !prev)}
-                className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] transition-colors rounded-full px-4 py-2 text-white text-[13px] font-semibold"
+                className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] transition-colors rounded-full px-3 md:px-4 py-2 text-white text-[13px] font-semibold"
               >
-                {waitingRoomList.length === 1 ? 'Admit one guest' : `Admit ${waitingRoomList.length} guests`}
+                <span className="md:hidden flex items-center gap-1.5">
+                  <Users size={16} />
+                  <span className="bg-white text-[#10B981] px-1.5 rounded-full text-[11px] leading-tight font-bold">{waitingRoomList.length}</span>
+                </span>
+                <span className="hidden md:inline">
+                  {waitingRoomList.length === 1 ? 'Admit one guest' : `Admit ${waitingRoomList.length} guests`}
+                </span>
               </button>
 
               {showAdmitPopup && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-30 text-left">
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 md:absolute md:top-full md:right-0 md:left-auto md:translate-x-0 mt-0 md:mt-2 w-[calc(100vw-2rem)] max-w-sm md:w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-50 text-left">
                   <div className="text-[13px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-3">In waiting room</div>
 
                   {waitingRoomList.length === 1 ? (
@@ -1002,7 +1048,7 @@ function MeetingRoomContent({
         </div>
       </div>
       {/* Main Content */}
-      <div className="flex-1 h-full min-h-0 min-w-0 flex overflow-hidden relative">
+      <div className={`flex-1 h-full min-h-0 min-w-0 flex overflow-hidden relative transition-all duration-300 ${isMobile && controlsVisible ? 'pt-[56px] pb-[80px]' : 'pt-0 pb-0'} md:pt-0 md:pb-0`}>
         {/* Video Grid */}
         <div className="flex-1 h-full min-h-0 min-w-0 p-4 flex flex-col">
           <div className="flex-1 h-full min-h-0 rounded-xl shadow-lg relative">
@@ -1012,10 +1058,13 @@ function MeetingRoomContent({
 
         {/* Sidebar */}
         <div 
-          className="h-full overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0"
-          style={{ width: isSidebarOpen ? '340px' : '0px', minWidth: isSidebarOpen ? '340px' : '0px' }}
+          className={`h-full overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0 ${
+            isSidebarOpen 
+              ? 'absolute inset-0 z-40 w-full min-w-full md:relative md:inset-auto md:w-[340px] md:min-w-[340px]' 
+              : 'w-0 min-w-0'
+          }`}
         >
-          <div className="w-[340px] h-full bg-[#0F172A] flex flex-col border-l border-[#1E293B]">
+          <div className="w-full md:w-[340px] h-full bg-[#0F172A] flex flex-col border-l border-[#1E293B]">
             {showParticipantPanel ? (
               <ParticipantListPanel 
                 onClose={() => setShowParticipantPanel(false)} 
@@ -1030,19 +1079,27 @@ function MeetingRoomContent({
               <>
                 {/* Tabs */}
                 <div className="flex border-b border-[#1E293B]">
-                  {captionsEnabled && (
+                  <div className="flex flex-1">
+                    {captionsEnabled && (
+                      <button 
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-[13px] font-medium transition-colors ${activeTab === 'transcript' ? 'border-b-2 border-[#4F46E5] text-[#4F46E5]' : 'text-[#94A3B8] hover:bg-[#1E293B]'}`}
+                        onClick={() => setActiveTab('transcript')}
+                      >
+                        <FileText size={16} /> Transcript
+                      </button>
+                    )}
                     <button 
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 text-[13px] font-medium transition-colors ${activeTab === 'transcript' ? 'border-b-2 border-[#4F46E5] text-[#4F46E5]' : 'text-[#94A3B8] hover:bg-[#1E293B]'}`}
-                      onClick={() => setActiveTab('transcript')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 text-[13px] font-medium transition-colors ${activeTab === 'chat' ? 'border-b-2 border-[#4F46E5] text-[#4F46E5]' : 'text-[#94A3B8] hover:bg-[#1E293B]'}`}
+                      onClick={() => setActiveTab('chat')}
                     >
-                      <FileText size={16} /> Transcript
+                      <MessageSquare size={16} /> Chat
                     </button>
-                  )}
-                  <button 
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-[13px] font-medium transition-colors ${activeTab === 'chat' ? 'border-b-2 border-[#4F46E5] text-[#4F46E5]' : 'text-[#94A3B8] hover:bg-[#1E293B]'}`}
-                    onClick={() => setActiveTab('chat')}
+                  </div>
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="md:hidden flex items-center justify-center px-4 border-l border-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B] transition-colors"
                   >
-                    <MessageSquare size={16} /> Chat
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -1165,15 +1222,16 @@ function MeetingRoomContent({
       </div>
 
       {/* Control Bar */}
-      <div className="h-[80px] bg-[#0F172A] border-t border-[#1E293B] flex items-center justify-center gap-4 px-6 relative flex-shrink-0">
-        
-        {/* Mic Group */}
-        <div ref={micPanelRef} className={`relative flex items-center rounded-full transition-colors ${isMicMuted ? 'bg-[#EF4444]' : 'bg-[#334155]'}`}>
-          <button 
-            onClick={handleToggleMic}
-            className={`w-12 h-12 rounded-l-full flex items-center justify-center transition-colors ${
-              isMicMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
-            }`}
+      <div className={`h-[80px] bg-[#0F172A] border-t border-[#1E293B] flex items-center justify-between md:justify-center px-2 md:px-6 md:relative absolute bottom-0 w-full z-20 transition-transform duration-300 flex-shrink-0 ${!isMobile || controlsVisible ? 'translate-y-0' : 'translate-y-full'}`}>
+        <div className="flex-1 md:flex-initial relative md:static overflow-hidden md:overflow-visible mr-2 md:mr-0">
+          <div className="w-full h-full flex items-center justify-start md:justify-center gap-2 md:gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pr-8 md:pr-0">
+            {/* Mic Group */}
+            <div ref={micPanelRef} className={`relative flex items-center rounded-full transition-colors flex-shrink-0 ${isMicMuted ? 'bg-[#EF4444]' : 'bg-[#334155]'}`}>
+              <button 
+                onClick={handleToggleMic}
+                className={`w-11 md:w-12 h-11 md:h-12 rounded-l-full flex items-center justify-center transition-colors ${
+                  isMicMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
+                }`}
           >
             {isMicMuted ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
           </button>
@@ -1182,7 +1240,7 @@ function MeetingRoomContent({
           
           <button 
             onClick={() => { setShowMicDevices(!showMicDevices); setShowCamDevices(false); }}
-            className={`w-7 h-12 rounded-r-full flex items-center justify-center transition-colors ${
+            className={`w-6 md:w-7 h-11 md:h-12 rounded-r-full flex items-center justify-center transition-colors ${
               isMicMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
             } text-white`}
           >
@@ -1191,7 +1249,7 @@ function MeetingRoomContent({
 
           {/* Popup */}
           {showMicDevices && (
-            <div className="absolute bottom-[110%] left-0 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
+            <div className="fixed md:absolute bottom-[90px] md:bottom-[110%] left-4 md:left-0 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
               <div className="text-[11px] font-semibold text-[#94A3B8] mb-1.5 px-2 uppercase tracking-wider">Microphone</div>
               {micDevices?.length > 0 ? micDevices.map(device => (
                 <button
@@ -1209,32 +1267,32 @@ function MeetingRoomContent({
           )}
         </div>
 
-        {/* Camera Group */}
-        <div ref={camPanelRef} className={`relative flex items-center rounded-full transition-colors ${isCamMuted ? 'bg-[#EF4444]' : 'bg-[#334155]'}`}>
-          <button 
-            onClick={handleToggleCamera}
-            className={`w-12 h-12 rounded-l-full flex items-center justify-center transition-colors ${
-              isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
-            }`}
-          >
-            {isCamMuted ? <VideoOff size={20} className="text-white" /> : <Video size={20} className="text-white" />}
-          </button>
-          
-          <div className={`w-px h-6 ${isCamMuted ? 'bg-[#B91C1C]' : 'bg-[#475569]'}`}></div>
-          
-          <button 
-            onClick={() => { setShowCamDevices(!showCamDevices); setShowMicDevices(false); }}
-            className={`w-7 h-12 rounded-r-full flex items-center justify-center transition-colors ${
-              isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
-            } text-white`}
-          >
-            <ChevronUp size={16} />
-          </button>
+            {/* Camera Group */}
+            <div ref={camPanelRef} className={`relative flex items-center rounded-full transition-colors flex-shrink-0 ${isCamMuted ? 'bg-[#EF4444]' : 'bg-[#334155]'}`}>
+              <button 
+                onClick={handleToggleCamera}
+                className={`w-11 md:w-12 h-11 md:h-12 rounded-l-full flex items-center justify-center transition-colors ${
+                  isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
+                }`}
+              >
+                {isCamMuted ? <VideoOff size={20} className="text-white" /> : <Video size={20} className="text-white" />}
+              </button>
+              
+              <div className={`w-px h-6 ${isCamMuted ? 'bg-[#B91C1C]' : 'bg-[#475569]'}`}></div>
+              
+              <button 
+                onClick={() => { setShowCamDevices(!showCamDevices); setShowMicDevices(false); }}
+                className={`w-6 md:w-7 h-11 md:h-12 rounded-r-full flex items-center justify-center transition-colors ${
+                  isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
+                } text-white`}
+              >
+                <ChevronUp size={16} />
+              </button>
 
-          {/* Popup */}
-          {showCamDevices && (
-            <div className="absolute bottom-[110%] left-0 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
-              <div className="text-[11px] font-semibold text-[#94A3B8] mb-1.5 px-2 uppercase tracking-wider">Camera</div>
+              {/* Popup */}
+              {showCamDevices && (
+                <div className="fixed md:absolute bottom-[90px] md:bottom-[110%] left-4 md:left-0 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
+                  <div className="text-[11px] font-semibold text-[#94A3B8] mb-1.5 px-2 uppercase tracking-wider">Camera</div>
               {camDevices?.length > 0 ? camDevices.map(device => (
                 <button
                   key={device.deviceId}
@@ -1251,13 +1309,13 @@ function MeetingRoomContent({
           )}
         </div>
         
-        {/* Screen Share Button */}
-        <button 
-          onClick={handleToggleScreenShare}
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
-            !isScreenShared ? 'bg-[#4F46E5] hover:bg-[#4338CA]' : 'bg-[#334155] hover:bg-[#475569]'
-          }`}
-        >
+            {/* Screen Share Button */}
+            <button 
+              onClick={handleToggleScreenShare}
+              className={`w-11 md:w-12 h-11 md:h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                !isScreenShared ? 'bg-[#4F46E5] hover:bg-[#4338CA]' : 'bg-[#334155] hover:bg-[#475569]'
+              }`}
+            >
           <MonitorUp size={20} className="text-white" />
         </button>
 
@@ -1265,17 +1323,62 @@ function MeetingRoomContent({
         <RecordCallButton />
         <ReactionsButton />
 
+            {/* Settings Toggle Button */}
+            {isHost && (
+              <div ref={settingsPopupRef} className="relative md:absolute md:right-[72px] md:top-1/2 md:-translate-y-1/2 z-20 flex-shrink-0">
+                <button
+                  onClick={() => setShowSettingsPopup(prev => !prev)}
+                  className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors"
+                  title="Meeting settings"
+                >
+                  <Settings size={18} />
+                </button>
+
+                {showSettingsPopup && (
+                  <div className="fixed bottom-[90px] right-4 md:absolute md:bottom-full md:right-0 md:mb-2 w-[calc(100vw-2rem)] md:w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-30 text-left">
+                    <div className="text-[13px] font-semibold text-white mb-3">Meeting Settings</div>
+                    <div className="flex items-center justify-between">
+                      <div className="pr-3">
+                        <div className="text-[13px] font-medium text-white">Make this meeting open for all</div>
+                        <div className="text-[11px] text-[#94A3B8] mt-0.5">Anyone with the link or code joins instantly, without waiting for admission</div>
+                      </div>
+                      <button
+                        onClick={() => toggleOpenForAll(!meeting?.openForAll)}
+                        className={`w-10 h-[22px] rounded-full relative transition-colors flex-shrink-0 ${meeting?.openForAll ? 'bg-[#4F46E5]' : 'bg-[#475569]'}`}
+                      >
+                        <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${meeting?.openForAll ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sidebar Toggle Button */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="relative md:absolute md:right-6 md:top-1/2 md:-translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors flex-shrink-0"
+              title={isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+            >
+              {isSidebarOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            </button>
+
+          </div>
+          {/* Gradient fade to indicate scrollability on mobile */}
+          <div className="md:hidden absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0F172A] to-transparent pointer-events-none" />
+        </div>
+
         {/* End Call Button */}
-        <div ref={endCallPopupRef} className="relative ml-4 flex-shrink-0">
+        <div ref={endCallPopupRef} className="relative flex-shrink-0 md:ml-4">
           <button 
             onClick={handleEndCallButtonClick}
-            className="w-16 h-12 rounded-full bg-[#EF4444] hover:bg-[#DC2626] flex items-center justify-center transition-colors"
+            className="w-14 md:w-16 h-11 md:h-12 rounded-full bg-[#EF4444] hover:bg-[#DC2626] flex items-center justify-center transition-colors"
           >
             <PhoneOff size={20} className="text-white" />
           </button>
 
           {showEndCallPopup && isHost && (
-            <div className="absolute bottom-[110%] left-1/2 -translate-x-1/2 w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
+            <div className="fixed md:absolute bottom-[90px] md:bottom-[110%] right-4 md:left-1/2 md:-translate-x-1/2 md:right-auto w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
               <button
                 onClick={handleEndForAll}
                 className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-lg transition-colors mb-1.5"
@@ -1292,51 +1395,11 @@ function MeetingRoomContent({
           )}
         </div>
 
-        {/* Settings Toggle Button */}
-        {isHost && (
-          <div ref={settingsPopupRef} className="absolute right-[72px] top-1/2 -translate-y-1/2 z-20">
-            <button
-              onClick={() => setShowSettingsPopup(prev => !prev)}
-              className="w-10 h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors"
-              title="Meeting settings"
-            >
-              <Settings size={18} />
-            </button>
-
-            {showSettingsPopup && (
-              <div className="absolute bottom-full right-0 mb-2 w-72 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-4 z-30 text-left">
-                <div className="text-[13px] font-semibold text-white mb-3">Meeting Settings</div>
-                <div className="flex items-center justify-between">
-                  <div className="pr-3">
-                    <div className="text-[13px] font-medium text-white">Make this meeting open for all</div>
-                    <div className="text-[11px] text-[#94A3B8] mt-0.5">Anyone with the link or code joins instantly, without waiting for admission</div>
-                  </div>
-                  <button
-                    onClick={() => toggleOpenForAll(!meeting?.openForAll)}
-                    className={`w-10 h-[22px] rounded-full relative transition-colors flex-shrink-0 ${meeting?.openForAll ? 'bg-[#4F46E5]' : 'bg-[#475569]'}`}
-                  >
-                    <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${meeting?.openForAll ? 'translate-x-[18px]' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="absolute right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors"
-          title={isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
-        >
-          {isSidebarOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </button>
-
       </div>
 
       {/* Meeting Ready Card */}
       {showMeetingReadyCard && isHost && (
-        <div className="fixed bottom-[96px] left-4 z-30 w-[380px] bg-white rounded-xl shadow-xl p-5">
+        <div className="fixed bottom-[96px] left-4 z-30 w-[calc(100vw-2rem)] max-w-[380px] md:w-[380px] bg-white rounded-xl shadow-xl p-5">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-[16px] font-semibold text-[#111827]">Your meeting's ready</h3>
             <button 

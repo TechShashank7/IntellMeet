@@ -40,6 +40,7 @@ export default function TaskBoard() {
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [activeColumn, setActiveColumn] = useState<Task['status']>('backlog');
 
   // Filter states
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -272,7 +273,7 @@ export default function TaskBoard() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-xl shadow-lg w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[400px] p-6 mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-[#111827] mb-4">Add Task</h2>
             <form onSubmit={handleAddTaskSubmit} className="space-y-4">
               <div>
@@ -354,12 +355,12 @@ export default function TaskBoard() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-6 border-b border-[#E5E7EB] bg-white flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 md:px-8 py-6 border-b border-[#E5E7EB] bg-white flex-shrink-0">
         <div>
           <h1 className="text-[24px] font-bold text-[#111827]">Action Items</h1>
           <p className="text-[#6B7280] text-[14px] mt-1">Manage and track follow-ups from your meetings.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {teams.length > 0 && (
             <div className="relative inline-block z-10">
               <button
@@ -408,7 +409,7 @@ export default function TaskBoard() {
               placeholder="Search tasks..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-[240px]"
+              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-full sm:w-[240px]"
             />
           </div>
           <div className="relative">
@@ -491,15 +492,34 @@ export default function TaskBoard() {
           Loading tasks...
         </div>
       ) : (
-        <div className="flex-1 overflow-hidden p-8">
-          <div className="grid grid-cols-4 gap-6 h-full">
+        <div className="flex-1 overflow-hidden p-4 md:p-8 flex flex-col">
+          {/* Mobile Tab Switcher */}
+          <div className="md:hidden flex gap-2 overflow-x-auto pb-4 flex-shrink-0 mb-4">
+            {COLUMNS.map(col => {
+              const count = filteredTasks.filter(t => t.status === col.id).length;
+              const isActive = activeColumn === col.id;
+              return (
+                <button 
+                  key={col.id}
+                  onClick={() => setActiveColumn(col.id as Task['status'])}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap border transition-colors ${isActive ? 'border-[#4F46E5] bg-[#EEF2FF] text-[#4F46E5]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'}`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
+                  {col.title} <span className="bg-[#E5E7EB] text-[#4B5563] px-1.5 py-0.5 rounded-full text-[10px]">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
             {COLUMNS.map((col) => {
               const columnTasks = filteredTasks.filter(t => t.status === col.id);
+              const isMobileActive = activeColumn === col.id;
               
               return (
                 <div 
                   key={col.id} 
-                  className="flex flex-col h-full rounded-xl transition-colors border border-transparent min-w-0"
+                  className={`flex-col h-full rounded-xl transition-colors border border-transparent min-w-0 ${isMobileActive ? 'flex' : 'hidden md:flex'}`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, col.id as Task['status'])}
@@ -610,7 +630,7 @@ export default function TaskBoard() {
       {/* Detail Modal */}
       {selectedTask && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedTask(null)}>
-          <div className="bg-white rounded-xl shadow-lg w-[450px] p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[450px] p-6 max-h-[90vh] overflow-y-auto mx-4" onClick={(e) => e.stopPropagation()}>
             {isCommentsView ? (
               <div className="flex flex-col h-[450px]">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">

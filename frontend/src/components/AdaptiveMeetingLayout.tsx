@@ -1,4 +1,5 @@
 import { useCallStateHooks, ParticipantView, type StreamVideoParticipant } from '@stream-io/video-react-sdk';
+import { useState, useEffect } from 'react';
 
 interface AdaptiveMeetingLayoutProps {
   isSidebarOpen?: boolean;
@@ -9,6 +10,13 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
   const { useParticipants, useLocalParticipant } = useCallStateHooks();
   const participants = useParticipants();
   const localParticipant = useLocalParticipant();
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const remoteParticipants = participants.filter(
     (p) => p.sessionId !== localParticipant?.sessionId
@@ -36,7 +44,49 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
       );
     }
 
-    // 2+ Participants
+    if (isMobile) {
+      const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
+      let visibleParticipants: StreamVideoParticipant[] = [];
+      let hiddenCount = 0;
+      
+      if (orderedParticipants.length <= 2) {
+        visibleParticipants = orderedParticipants;
+      } else {
+        visibleParticipants = [orderedParticipants[0], localParticipant].filter((p): p is StreamVideoParticipant => !!p);
+        hiddenCount = orderedParticipants.length - 2;
+      }
+
+      return (
+        <div className="flex flex-col w-full h-full gap-2">
+          {/* Main Screen Share Area */}
+          <div className="flex-1 rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-contain relative">
+            <ParticipantView participant={activeSharer} trackType="screenShareTrack" />
+          </div>
+          
+          {/* Bottom Strip */}
+          <div className="h-[120px] w-full flex-shrink-0 grid grid-cols-2 gap-2">
+            {visibleParticipants.map((p) => {
+              const isLocal = p.sessionId === localParticipant?.sessionId;
+              return (
+                <div key={p.sessionId} className="relative w-full h-full rounded-lg overflow-hidden bg-[#0F172A]">
+                  <ParticipantView participant={p} trackType="videoTrack" />
+                  {isLocal && hiddenCount > 0 && (
+                    <div 
+                      onClick={() => onShowParticipants && onShowParticipants()}
+                      className="absolute bottom-2 right-2 z-10 w-8 h-8 rounded-full bg-white text-[#111827] text-[12px] font-semibold flex items-center justify-center shadow-md cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      +{hiddenCount}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // 2+ Participants Desktop
     const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
 
     let stripContent;
@@ -123,6 +173,71 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
     );
   }
 
+  // --- MOBILE LAYOUT (No Screen Share) ---
+  if (isMobile) {
+    const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
+    
+    // 1 Participant
+    if (orderedParticipants.length === 1) {
+      return (
+        <div className="w-full h-full relative rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-cover">
+          <ParticipantView participant={orderedParticipants[0]} />
+        </div>
+      );
+    }
+    
+    // 2 Participants
+    if (orderedParticipants.length === 2) {
+      return (
+        <div className="grid grid-cols-1 grid-rows-2 gap-2 w-full h-full">
+          {orderedParticipants.map((p) => (
+            <div key={p.sessionId} className="w-full h-full rounded-xl overflow-hidden bg-[#0F172A]">
+              <ParticipantView participant={p} />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 3+ Participants
+    const MAX_VISIBLE = 8;
+    
+    let visibleParticipants = orderedParticipants;
+    let hiddenCount = 0;
+
+    if (orderedParticipants.length > MAX_VISIBLE) {
+      const visibleRemotes = remoteParticipants.slice(0, 7);
+      visibleParticipants = [...visibleRemotes, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
+      hiddenCount = orderedParticipants.length - MAX_VISIBLE;
+    }
+
+    return (
+      <div className="grid grid-cols-2 auto-rows-fr gap-2 w-full h-full overflow-y-auto">
+        {visibleParticipants.map((p, idx) => {
+          const isLocal = p.sessionId === localParticipant?.sessionId;
+          // Apply col-span-2 to the first item only if the TOTAL visible length is odd
+          const isFullWidth = idx === 0 && visibleParticipants.length % 2 !== 0;
+          
+          return (
+            <div key={p.sessionId} className={`relative w-full h-full min-h-[120px] rounded-xl overflow-hidden bg-[#0F172A] ${isFullWidth ? 'col-span-2' : 'col-span-1'}`}>
+              <ParticipantView participant={p} />
+              {isLocal && hiddenCount > 0 && (
+                <div 
+                  onClick={() => onShowParticipants && onShowParticipants()}
+                  className="absolute bottom-2 right-2 z-10 w-8 h-8 rounded-full bg-white text-[#111827] text-[12px] font-semibold flex items-center justify-center shadow-md cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  +{hiddenCount}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // --- DESKTOP LAYOUT (No Screen Share) ---
+  
   // 1 Participant (Just yourself)
   if (participants.length === 1 && localParticipant) {
     return (

@@ -562,12 +562,12 @@ export default function Dashboard() {
     const isCurrentUserAdmin = currentUserMember?.isAdmin;
 
     return (
-      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-4 md:p-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-[24px] font-[600] text-[#111827]">Teams</h2>
           <button
             onClick={() => setIsCreateTeamModalOpen(true)}
-            className="h-[36px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center gap-2 mr-14"
+            className="hidden md:flex h-[36px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[14px] font-[500] transition-colors items-center gap-2 mr-14"
           >
             <Plus size={16} /> Create Team
           </button>
@@ -579,11 +579,12 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            <div className="relative inline-block mb-6">
-              <button
-                onClick={() => setIsTeamDropdownOpen(!isTeamDropdownOpen)}
-                className="flex items-center gap-2.5 bg-white border border-[#E5E7EB] rounded-[8px] px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-[#D1D5DB] transition-colors min-w-[220px]"
-              >
+            <div className="flex flex-row items-center gap-3 mb-6">
+              <div className="relative inline-block flex-1 md:flex-none">
+                <button
+                  onClick={() => setIsTeamDropdownOpen(!isTeamDropdownOpen)}
+                  className="flex w-full items-center gap-2.5 bg-white border border-[#E5E7EB] rounded-[8px] px-3 py-2 md:px-4 md:py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-[#D1D5DB] transition-colors md:min-w-[220px]"
+                >
                 <div
                   className="w-7 h-7 rounded-[6px] flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
                   style={{ background: getAvatarColor(currentTeam?._id || '') }}
@@ -614,9 +615,16 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+              </div>
+              <button
+                onClick={() => setIsCreateTeamModalOpen(true)}
+                className="md:hidden flex h-[36px] px-3 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[8px] text-[13px] font-[500] transition-colors items-center justify-center whitespace-nowrap shadow-sm"
+              >
+                <Plus size={14} className="mr-1" /> Create Team
+              </button>
             </div>
 
-            <div className="bg-white border border-[#E5E7EB] rounded-[12px] p-6 shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+            <div className="md:bg-white md:border md:border-[#E5E7EB] md:rounded-[12px] md:p-6 md:shadow-[0_2px_4px_rgba(0,0,0,0.04)] -mx-4 md:mx-0 px-4 md:px-0">
               <h3 className="text-[15px] font-[600] text-[#111827] mb-4">Members</h3>
               {isLoadingMembers ? (
                 <p className="text-[#6B7280] text-[14px]">Loading members...</p>
@@ -839,17 +847,17 @@ export default function Dashboard() {
     const isLoadingAny = isLoadingUpcoming || isLoadingRecent;
 
     return (
-      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-4 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0 mb-6">
           <h2 className="text-[24px] font-[600] text-[#111827]">Meetings</h2>
-          <div className="relative mr-14">
+          <div className="relative w-full md:w-auto md:mr-14">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input
               type="text"
               placeholder="Search meetings..."
               value={meetingSearchQuery}
               onChange={(e) => setMeetingSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-[260px]"
+              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-full md:w-[260px]"
             />
           </div>
         </div>
@@ -1179,17 +1187,17 @@ export default function Dashboard() {
       : recordingsList;
 
     return (
-      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-4 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0 mb-6">
           <h2 className="text-[24px] font-[600] text-[#111827]">Recordings & Transcripts</h2>
-          <div className="relative mr-14">
+          <div className="relative w-full md:w-auto md:mr-14">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input
               type="text"
               placeholder="Search recordings..."
               value={meetingSearchQuery}
               onChange={(e) => setMeetingSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-[260px]"
+              className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-full md:w-[260px]"
             />
           </div>
         </div>
@@ -1322,8 +1330,8 @@ export default function Dashboard() {
     };
 
     return (
-      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
-        <div className="mb-8 flex items-center justify-between">
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-4 md:p-8">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-[24px] font-[700] text-[#111827]">Analytics</h2>
             <p className="text-[#6B7280] text-[14px] mt-1">Your meeting activity, engagement, and team throughput at a glance.</p>
@@ -1331,7 +1339,7 @@ export default function Dashboard() {
           <button
             onClick={handleExportAnalyticsCsv}
             disabled={isLoadingAnalytics}
-            className="h-[36px] px-4 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center gap-2 mr-14 disabled:opacity-50"
+            className="w-full justify-center md:justify-start md:w-auto h-[36px] px-4 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center gap-2 md:mr-14 disabled:opacity-50"
           >
             <Download size={16} /> Export Report
           </button>
@@ -1342,7 +1350,7 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-6">
             {/* KPI Row */}
-            <div className="grid grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="bg-white p-5 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
                 <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Total Meetings</h3>
                 <span className="text-[28px] font-[700] text-[#111827]">{analytics?.totalMeetings ?? 0}</span>
@@ -1389,7 +1397,7 @@ export default function Dashboard() {
             </div>
 
             {/* Two Donut Charts */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
                 <h3 className="text-[15px] font-[600] text-[#111827] mb-5">Call Satisfaction</h3>
                 {ratingData.length === 0 ? (
@@ -1448,7 +1456,7 @@ export default function Dashboard() {
               {!analytics?.productivity ? (
                 <div className="text-[#9CA3AF] text-[13px]">Select a team to see productivity metrics.</div>
               ) : (
-                <div className="grid grid-cols-4 gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div>
                     <h4 className="text-[#6B7280] text-[13px] font-[400] mb-2">Task Completion Rate</h4>
                     <span className="text-[24px] font-[700] text-[#111827]">{analytics.productivity.taskCompletionRate}%</span>
@@ -1470,7 +1478,7 @@ export default function Dashboard() {
             </div>
 
             {/* Engagement Report */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
                 <div className="flex items-center gap-2 mb-5">
                   <Users size={18} className="text-[#4F46E5]" />
@@ -1495,18 +1503,20 @@ export default function Dashboard() {
                 ) : (
                   <div className="space-y-3">
                     {analytics.engagement.topParticipants.map((p: any, idx: number) => (
-                      <div key={p.clerkId || idx} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                      <div key={p.clerkId || idx} className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
                           {p.profileImage ? (
-                            <img src={p.profileImage} alt={p.name} className="w-8 h-8 rounded-full object-cover" />
+                            <img src={p.profileImage} alt={p.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                           ) : (
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: getAvatarColor(p.clerkId || p.name) }}>
+                            <div className="w-8 h-8 rounded-full flex flex-shrink-0 items-center justify-center text-white text-[12px] font-bold" style={{ background: getAvatarColor(p.clerkId || p.name) }}>
                               {getInitials(p.name)}
                             </div>
                           )}
-                          <span className="text-[14px] font-[500] text-[#111827]">{p.name}</span>
+                          <span className="text-[14px] font-[500] text-[#111827] truncate">{p.name}</span>
                         </div>
-                        <span className="text-[13px] text-[#6B7280]">{p.meetingCount} meetings</span>
+                        <div className="text-[13px] text-[#6B7280] flex-shrink-0">
+                          {p.meetingCount} meeting{p.meetingCount !== 1 ? 's' : ''}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1521,11 +1531,11 @@ export default function Dashboard() {
 
   if (tab === 'settings') {
     return (
-      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-8">
+      <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter'] p-4 md:p-8">
         <h2 className="text-[24px] font-[700] text-[#111827] mb-6">Account Settings</h2>
-        <div className="flex gap-6 max-w-5xl">
+        <div className="flex flex-col md:flex-row gap-6 max-w-5xl">
           {/* Left mini-nav */}
-          <div className="w-[200px] flex-shrink-0">
+          <div className="w-full md:w-[200px] flex-shrink-0">
             <div className="bg-white border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] p-2">
               <button
                 onClick={() => setSettingsSection('profile')}
@@ -1543,7 +1553,7 @@ export default function Dashboard() {
           </div>
 
           {/* Right content */}
-          <div className="flex-1 space-y-6">
+          <div className="w-full md:flex-1 space-y-6">
             {settingsSection === 'profile' && (
               <>
                 <div className="bg-white border border-[#E5E7EB] rounded-[12px] shadow-[0_2px_4px_rgba(0,0,0,0.04)] p-6">
@@ -1581,7 +1591,7 @@ export default function Dashboard() {
                           {nameSaved && <span className="text-[#10B981] text-[12px] flex items-center gap-1"><Check size={12} /> Saved</span>}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <input
                             value={editFirstName}
                             onChange={(e) => setEditFirstName(e.target.value)}
@@ -1763,7 +1773,7 @@ export default function Dashboard() {
 
   return (
     <div className="bg-[#FAFAFA] min-h-screen w-full font-['Inter']">
-      <div className="max-w-[1200px] mx-auto w-full px-[32px] pb-[32px]">
+      <div className="max-w-[1200px] mx-auto w-full px-4 md:px-[32px] pb-[32px]">
         
         {/* Section 1 — Page Header */}
         <div className="flex items-center justify-between pt-[32px]">
@@ -1775,7 +1785,7 @@ export default function Dashboard() {
               {format(new Date(), 'EEEE, MMMM d, yyyy')}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="hidden md:flex gap-3">
             <button onClick={handleJoinWithCode} className="h-[36px] px-4 bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F3F4F6] rounded-[8px] text-[14px] font-[500] transition-colors flex items-center justify-center">
               Join with Code
             </button>
@@ -1787,7 +1797,7 @@ export default function Dashboard() {
         </div>
 
         {/* Section 2 — KPI Stats Row */}
-        <div className="flex gap-[24px] mt-[24px]">
+        <div className="hidden md:flex gap-[24px] mt-[24px]">
           {/* Card 1 */}
           <div className="flex-1 bg-[#FFFFFF] p-[20px] rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
             <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Meetings This Week</h3>
@@ -1841,9 +1851,9 @@ export default function Dashboard() {
         </div>
 
         {/* Section 4 — Two Column Content Area */}
-        <div className="flex items-stretch gap-[24px] mt-[44px]">
+        <div className="flex flex-col md:flex-row items-stretch gap-[24px] mt-[44px]">
           {/* Left Column — Upcoming Meetings */}
-          <div className="w-[58%] flex flex-col">
+          <div className="w-full md:w-[58%] flex flex-col">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <h2 className="text-[16px] font-[600] text-[#111827]">Upcoming Meetings</h2>
               <button className="text-[#4F46E5] text-[13px] font-[400] hover:underline">View Calendar &rarr;</button>
@@ -2141,7 +2151,7 @@ export default function Dashboard() {
           </div>
 
           {/* Right Column — Recent AI Summaries */}
-          <div className="w-[42%] flex flex-col">
+          <div className="hidden md:flex w-[42%] flex-col">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <h2 className="text-[16px] font-[600] text-[#111827]">Recent AI Summaries</h2>
             </div>

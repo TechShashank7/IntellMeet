@@ -301,16 +301,16 @@ export default function AISummary() {
               <ArrowLeft size={20} />
             </button>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-[20px] font-bold text-[#111827]">{meeting.title}</h1>
-                <span className="bg-[#EEF2FF] text-[#4F46E5] text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-[#4F46E5]/20">
+              <div className="flex items-center flex-wrap gap-3">
+                <h1 className="text-[20px] font-bold text-[#111827] flex-1 min-w-0">{meeting.title}</h1>
+                <span className="bg-[#EEF2FF] text-[#4F46E5] text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-[#4F46E5]/20 flex-shrink-0">
                   <Sparkles size={12} /> AI GENERATED
                 </span>
               </div>
-              <div className="flex items-center gap-4 mt-1 text-[13px] text-[#6B7280]">
-                <span className="flex items-center gap-1.5"><Calendar size={14} /> {meeting.date}</span>
-                <span className="flex items-center gap-1.5"><Clock size={14} /> {meeting.duration}</span>
-                <span className="flex items-center gap-1.5"><Users size={14} /> {meeting.attendees?.length || 0} Attendees</span>
+              <div className="flex items-center flex-wrap gap-4 mt-1 text-[13px] text-[#6B7280]">
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Calendar size={14} /> {meeting.date}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Clock size={14} /> {meeting.duration}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Users size={14} /> {meeting.attendees?.length || 0} Attendees</span>
               </div>
             </div>
           </div>
@@ -352,40 +352,33 @@ export default function AISummary() {
               Action Items
             </h2>
             <div className="space-y-3">
-              {mappedActionItems.length ? mappedActionItems.map((item: any) => (
-                <div key={item.id} className="flex items-start gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:border-[#D1D5DB] transition-colors">
-                  <div className="mt-1">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
-                      defaultChecked={item.done}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
-                    <div className="flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
-                      <div className="flex items-center gap-1.5">
-                        {item.assignee.profileImage ? (
-                          <img 
-                            src={item.assignee.profileImage} 
-                            alt={item.assignee.name}
-                            className="w-5 h-5 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div 
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                            style={{ background: item.assignee.color }}
-                          >
-                            {item.assignee.initials}
-                          </div>
-                        )}
-                        {item.assignee.name}
-                      </div>
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} /> {item.dueDate ? format(new Date(item.dueDate), 'MMM d') : 'No due date'}
-                      </span>
+              {mappedActionItems.length ? mappedActionItems.map((item: any) => {
+                const assigneeDateNode = (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      {item.assignee.profileImage ? (
+                        <img 
+                          src={item.assignee.profileImage} 
+                          alt={item.assignee.name}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div 
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
+                          style={{ background: item.assignee.color }}
+                        >
+                          {item.assignee.initials}
+                        </div>
+                      )}
+                      {item.assignee.name}
                     </div>
-                  </div>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={12} /> {item.dueDate ? format(new Date(item.dueDate), 'MMM d') : 'No due date'}
+                    </span>
+                  </>
+                );
+
+                const actionButtonNode = (
                   <button 
                     onClick={() => handleSyncToTasks(item)}
                     disabled={syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id)}
@@ -393,8 +386,34 @@ export default function AISummary() {
                   >
                     {syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) ? 'Synced' : 'Add to Tasks'}
                   </button>
-                </div>
-              )) : (
+                );
+
+                return (
+                  <div key={item.id} className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:border-[#D1D5DB] transition-colors">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                      <div className="mt-1 flex-shrink-0">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                          defaultChecked={item.done}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
+                        <div className="hidden md:flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
+                          {assigneeDateNode}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex md:contents flex-wrap items-center justify-between gap-2 md:gap-0 pl-8 md:pl-0">
+                      <div className="flex md:hidden items-center gap-3 text-[12px] text-[#6B7280]">
+                        {assigneeDateNode}
+                      </div>
+                      {actionButtonNode}
+                    </div>
+                  </div>
+                );
+              }) : (
                 <div className="text-[14px] text-[#6B7280] italic">No action items extracted.</div>
               )}
             </div>

@@ -1310,17 +1310,19 @@ function MeetingRoomContent({
         </div>
         
             {/* Screen Share Button */}
-            <button 
-              onClick={handleToggleScreenShare}
-              className={`w-11 md:w-12 h-11 md:h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
-                !isScreenShared ? 'bg-[#4F46E5] hover:bg-[#4338CA]' : 'bg-[#334155] hover:bg-[#475569]'
-              }`}
-            >
-          <MonitorUp size={20} className="text-white" />
-        </button>
+            {!isMobile && (
+              <button 
+                onClick={handleToggleScreenShare}
+                className={`w-11 md:w-12 h-11 md:h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                  !isScreenShared ? 'bg-[#4F46E5] hover:bg-[#4338CA]' : 'bg-[#334155] hover:bg-[#475569]'
+                }`}
+              >
+                <MonitorUp size={20} className="text-white" />
+              </button>
+            )}
 
         {/* Record & Emoji Buttons from Stream SDK */}
-        <RecordCallButton />
+        {!isMobile && <RecordCallButton />}
         <ReactionsButton />
 
             {/* Settings Toggle Button */}

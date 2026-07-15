@@ -57,9 +57,9 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
       }
 
       return (
-        <div className="flex flex-col w-full h-full gap-2">
+        <div className="flex flex-col w-full h-full gap-2 min-h-0">
           {/* Main Screen Share Area */}
-          <div className="flex-1 rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-contain relative">
+          <div className="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-contain relative">
             <ParticipantView participant={activeSharer} trackType="screenShareTrack" />
           </div>
           

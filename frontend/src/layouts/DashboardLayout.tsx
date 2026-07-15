@@ -16,8 +16,7 @@ import {
   MoreHorizontal,
   Bell,
   PlayCircle,
-  Menu,
-  X
+  Menu
 } from 'lucide-react';
 
 const navItems = [

@@ -8,8 +8,6 @@
 
 [![Frontend](https://img.shields.io/badge/Frontend-Vercel-black?logo=vercel)](https://intell-meet-ruby.vercel.app)
 [![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render)](https://intellmeet-backend-ba9b.onrender.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](#-license)
-[![Status](https://img.shields.io/badge/Status-Actively%20Developed-brightgreen)](#-development-roadmap)
 
 [Live App](https://intell-meet-ruby.vercel.app) · [API](https://intellmeet-backend-ba9b.onrender.com) · [Report a Bug](shashankraj7604@gmail.com)
 
@@ -20,8 +18,6 @@
 ## 📌 Overview
 
 **IntellMeet** is a full-stack, AI-powered video conferencing and meeting intelligence platform built for enterprise, startup, and company-level teams. It brings together live video calls, real-time transcription, and **Google Gemini**-driven summarization into a single workspace — so meetings turn into searchable notes and trackable tasks automatically, instead of disappearing the moment the call ends.
-
-Built as a Zidio Development project, IntellMeet is designed and benchmarked against products like **Zoom, Google Meet, Linear, Loom, and Notion** for both functionality and interface quality.
 
 ---
 

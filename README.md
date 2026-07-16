@@ -4,7 +4,14 @@
 
 ### AI-Powered Enterprise Meeting Intelligence Platform
 
-Transcribe. Summarize. Act. — Automatically.
+**Transcribe. Summarize. Act. — Automatically.**
+
+[![Frontend](https://img.shields.io/badge/Frontend-Vercel-black?logo=vercel)](https://intell-meet-ruby.vercel.app)
+[![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render)](https://intellmeet-backend-ba9b.onrender.com)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](#-license)
+[![Status](https://img.shields.io/badge/Status-Actively%20Developed-brightgreen)](#-development-roadmap)
+
+[Live App](https://intell-meet-ruby.vercel.app) · [API](https://intellmeet-backend-ba9b.onrender.com) · [Report a Bug](shashankraj7604@gmail.com)
 
 </div>
 
@@ -12,27 +19,43 @@ Transcribe. Summarize. Act. — Automatically.
 
 ## 📌 Overview
 
-**IntellMeet** is an AI-powered meeting intelligence platform built for enterprise, startup, and company-level teams. It captures live video meetings, transcribes conversations in real time, and uses **Google Gemini** to generate structured summaries and actionable follow-ups — automatically synced to a collaborative task board.
+**IntellMeet** is a full-stack, AI-powered video conferencing and meeting intelligence platform built for enterprise, startup, and company-level teams. It brings together live video calls, real-time transcription, and **Google Gemini**-driven summarization into a single workspace — so meetings turn into searchable notes and trackable tasks automatically, instead of disappearing the moment the call ends.
 
-> ⚠️ **Status:** This project is under **active development**.
-
----
-
-> ℹ️ The backend is hosted on Render's free tier, so the **first request may take up to ~50 seconds** to respond while the server spins up from sleep.
+Built as a Zidio Development project, IntellMeet is designed and benchmarked against products like **Zoom, Google Meet, Linear, Loom, and Notion** for both functionality and interface quality.
 
 ---
 
 ## ✨ Features
 
-- 🎥 **Live Video Meetings** — Powered by Stream Video, with real-time call creation and management
-- 📝 **Real-Time Transcription** — Every word captured and attributed automatically during calls
-- 🤖 **AI Meeting Summaries** — Gemini distills full transcripts into structured, readable summaries
-- ✅ **Auto-Extracted Action Items** — Decisions and next steps are pulled straight from the conversation
-- 📋 **Task Board Sync** — Promote AI-detected action items into a real Kanban-style task board
-- 💬 **In-Meeting Chat** — Stream Chat integration alongside video for parallel communication
-- 👥 **Team Workspaces** — Multi-team support with role-based membership and invites
-- 🔐 **Secure Auth** — Full authentication and user management via Clerk
-- 📊 **Live Dashboard** — Upcoming meetings, recent summaries, and open action items at a glance
+### 🎥 Meetings & Video
+- **Live video meetings** powered by the Stream Video SDK — instant meetings, scheduled meetings, and join-by-code
+- **Adaptive meeting layout** with Google Meet–style responsive tiling for 1 to many participants, plus dedicated screen-share layouts
+- **Waiting room & access control** — hosts can admit, deny, or admit-all, or open a meeting for anyone with the link
+- **In-meeting chat** via Stream Chat, running alongside video
+- **Live closed captions** with per-speaker attribution
+- **Collapsible sidebar** for chat, transcript, and participant management
+- **Post-call rating & insights gate** to capture quick feedback after every meeting
+
+### 🤖 AI Meeting Intelligence
+- **Real-time transcription**, automatically started and stopped with the call
+- **Gemini-powered summaries** — structured executive summaries generated from the full transcript
+- **Auto-extracted action items** with assignee and due-date detection, ready to promote into real tasks
+- **Fallback processing pipeline** that recovers gracefully if a transcript arrives late or a webhook is missed
+
+### 📋 Tasks & Teams
+- **Kanban-style task board** with priority, due dates, assignees, and comments
+- **One-click promotion** of AI-detected action items into tracked tasks
+- **Multi-team workspaces** with admin/member roles, invites, and team switching
+- **Analytics dashboard** — meeting cadence, ratings, engagement, and team productivity metrics
+
+### 🗂️ Recordings, Transcripts & Sharing
+- **Recordings library** with playback, per-session transcripts, and duration tracking
+- **PDF export** of meeting notes and executive summaries (generated server-side)
+- **Slack & Notion sync** — push summaries and action items straight into your team's existing tools
+
+### 🔐 Platform
+- **Secure authentication** end-to-end via Clerk (sign-up, sign-in, profile, sessions, password management)
+- **Live dashboard** — upcoming meetings, recent AI summaries, and open action items at a glance
 
 ---
 
@@ -43,11 +66,11 @@ Transcribe. Summarize. Act. — Automatically.
 |---|---|
 | **React 19 + TypeScript** | Core UI framework |
 | **Vite** | Build tooling & dev server |
-| **Tailwind CSS v3** | Styling |
-| **shadcn/ui** | Component primitives |
+| **Tailwind CSS v3 + shadcn/ui** | Styling & component primitives |
 | **TanStack Query** | Server state & data fetching |
-| **Zustand** | Client state management |
-| **Clerk (React)** | Authentication |
+| **Zustand** | Client state management (teams, meetings, tasks) |
+| **Clerk (React)** | Authentication & user/session management |
+| **Stream Video & Chat React SDK** | Video calls, chat, captions, recordings |
 
 ### Backend
 | Technology | Purpose |
@@ -55,9 +78,17 @@ Transcribe. Summarize. Act. — Automatically.
 | **Node.js + Express** | REST API server |
 | **MongoDB + Mongoose** | Primary database |
 | **Clerk (Express)** | Auth middleware & session verification |
-| **Stream** | Video calls + real-time chat |
-| **Google Gemini** | AI summarization & action item extraction |
-| **Inngest** | Background event handling (user sync, webhooks) |
+| **Stream (Node SDK)** | Video call orchestration, chat, recordings, transcription |
+| **Google Gemini** (`gemini-2.5-flash`) | AI summarization & action item extraction |
+| **pdfkit** | Server-side PDF generation, streamed to the client |
+| **Inngest** | Background event handling (user sync, lifecycle webhooks) |
+
+### Infrastructure
+| Service | Purpose |
+|---|---|
+| **Vercel** | Frontend hosting |
+| **Render** | Backend hosting |
+| **MongoDB Atlas** | Managed database |
 
 ---
 
@@ -71,11 +102,13 @@ flowchart LR
     B --> E[Gemini AI]
     D -->|Webhook transcription ready| B
     B -->|AI Summary and Action Items| C
+    B -->|PDF export| G[pdfkit]
+    B -->|Sync| H[Slack and Notion]
     F[Clerk] -->|Auth| A
     F -->|Session Verification| B
 ```
 
-**Flow:** A user starts or joins a meeting → Stream handles video/chat and live transcription → once a call ends, a webhook delivers the transcript to the backend → Gemini processes it into a summary + action items → results are stored in MongoDB and surfaced on the dashboard, where action items can be promoted to the shared task board.
+**Flow:** A user starts, schedules, or joins a meeting → Stream handles video, chat, live captions, and transcription → once the call ends, a webhook (with a fallback polling path) delivers the transcript to the backend → Gemini processes it into a structured summary and action items → results are persisted in MongoDB and surfaced on the dashboard, where action items can be promoted to the team's task board, exported as a PDF, or synced to Slack/Notion.
 
 ---
 
@@ -83,23 +116,27 @@ flowchart LR
 
 ```
 IntellMeet/
-├── frontend/               # React + TypeScript client
+├── frontend/                 # React + TypeScript client
 │   ├── src/
-│   │   ├── pages/          # Dashboard, MeetingRoom, TaskBoard, AISummary, etc.
-│   │   ├── layouts/        # DashboardLayout (sidebar shell)
-│   │   ├── store/          # Zustand stores
-│   │   └── lib/            # api.ts (backend adapter), utils.ts
+│   │   ├── pages/            # Dashboard, MeetingRoom, TaskBoard, AISummary,
+│   │   │                     # RecordingDetail, Onboarding, Sign In/Up
+│   │   ├── components/       # AdaptiveMeetingLayout, ParticipantListPanel, etc.
+│   │   ├── layouts/          # DashboardLayout (sidebar shell), AuthLayout
+│   │   ├── store/            # Zustand stores (teams, meetings, tasks)
+│   │   └── lib/               # api.ts (backend adapter), utils.ts
 │   └── ...
-└── backend/                 # Node.js + Express API
+└── backend/                  # Node.js + Express API
     ├── src/
-    │   ├── models/          # User, Team, Session, Task, ActionItem
-    │   ├── controllers/     # session, team, task, ai, webhook, chat
+    │   ├── models/            # User, Team, Session, Task, ActionItem,
+    │   │                       # Invite, MeetingInvite
+    │   ├── controllers/       # session, team, task, ai, webhook, chat
     │   ├── routes/
-    │   ├── middleware/      # Clerk auth
-    │   ├── services/        # Gemini AI pipeline
-    │   └── lib/             # db, stream, env, resolveParticipants
+    │   ├── middleware/        # Clerk auth
+    │   ├── services/          # Gemini AI pipeline, Slack/Notion integrations
+    │   ├── lib/                # db, stream, env, resolveParticipants, inngest
+    │   └── scripts/           # backfills & diagnostics (recordings, transcripts,
+    │                          # Stream user sync)
     └── ...
-
 ```
 
 ---
@@ -112,6 +149,7 @@ IntellMeet/
 - Clerk account (API keys)
 - Stream account (API key + secret)
 - Google Gemini API key
+- (Optional) ngrok, for testing Stream webhooks locally
 
 ### 1. Clone the repo
 ```bash
@@ -149,26 +187,32 @@ npm install
 Create a `.env` file:
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+VITE_STREAM_API_KEY=your_stream_api_key
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 ```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The app will be available at `http://localhost:5173`, with the API running on `http://localhost:5000`.
+
+### 4. (Optional) Webhooks locally
+To receive Stream transcription/recording webhooks during local development, tunnel the backend with ngrok and point the Stream dashboard's webhook URL at the tunnel:
+```bash
+ngrok http 5000
+```
 
 ---
 
 ## 🗺️ Development Roadmap
 
-- [x] **Phase 0** — Backend boots cleanly against real MongoDB
-- [x] **Phase 1** — Clerk authentication integrated, replacing mock auth store
-- [x] **Phase 2** — Real meeting data pipeline (create, join, end sessions) wired into the dashboard
-- [ ] **Phase 2.5** — Task status alignment between frontend/backend + full task board sync
-- [ ] **Phase 3** — Gemini AI summary pipeline fully connected end-to-end
-- [ ] **Phase 4** — Analytics, integrations (Slack/Notion), and polish
-
-Development follows a **phased, browser-verified approach** — each phase is completed and tested before the next begins.
+- [x] **Phase 0** — Backend boot & MongoDB connection
+- [x] **Phase 1** — Clerk authentication, end-to-end across the frontend
+- [x] **Phase 2** — Meetings, tasks, team onboarding, and a real API layer
+- [x] **Phase 3** — Stream webhook receiver + Gemini summarization pipeline
+- [x] **Phase 4** — Live meeting room: chat, closed captions, adaptive video layout, screen share, waiting room, post-call ratings, Kanban board
+- [x] **Phase 5** — recordings list/detail, playback, PDF export, timestamped transcript segments
+- [x] **Phase 6** — PDF download, Slack, and Notion integrations per team
 
 ---
 
@@ -177,7 +221,7 @@ Development follows a **phased, browser-verified approach** — each phase is co
 | Name | Role |
 |---|---|
 | **Shashank Raj** | Frontend & Product Architecture |
-| **Tanuj Gupta** | Backend Development |
+| **Tanuj Gupta** | Backend Development & Infrastructure |
 | **Dara Saiteja** | Frontend Development |
 | **Gaurav Kumar** | Backend Development |
 

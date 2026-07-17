@@ -103,51 +103,58 @@ const getSessionSummary = asyncHandler(async (req, res) => {
       session = lockedSession; // we got the lock
       try {
         if (!session.transcript || session.transcript.trim().length === 0) {
-          const call = streamClient.video.call("default", session.callId);
-          const transcriptionsResult = await call.listTranscriptions();
-          const transcriptions = transcriptionsResult.transcriptions || [];
+          const timeSinceEnd = session.endTime ? (Date.now() - new Date(session.endTime).getTime()) : 0;
           
-          if (transcriptions.length > 0) {
-            const readyTranscription = transcriptions.find(t => t.url);
-            if (readyTranscription) {
-              const response = await fetch(readyTranscription.url);
-              if (response.ok) {
-                const rawText = await response.text();
-                const lines = rawText.split('\n').filter(line => line.trim() !== '');
-                
-                const transcriptParts = lines.map(line => {
-                  try {
-                    const parsed = JSON.parse(line);
-                    return `${parsed.speaker_id || 'Unknown'}: ${parsed.text}`;
-                  } catch (e) {
-                    return null;
-                  }
-                }).filter(Boolean);
-
-                const transcriptSegments = lines.map(line => {
-                  try {
-                    const parsed = JSON.parse(line);
-                    if (parsed && parsed.text) {
-                      return {
-                        speakerId: parsed.speaker_id || null,
-                        text: parsed.text,
-                        timestamp: session.transcriptionStartedAt && typeof parsed.start_ts === 'number'
-                          ? new Date(session.transcriptionStartedAt.getTime() + parsed.start_ts)
-                          : null
-                      };
+          if (timeSinceEnd > 120000) {
+            session.transcript = "No speech was detected during this meeting. It was likely a silent or very brief session.";
+            await session.save();
+          } else {
+            const call = streamClient.video.call("default", session.callId);
+            const transcriptionsResult = await call.listTranscriptions();
+            const transcriptions = transcriptionsResult.transcriptions || [];
+            
+            if (transcriptions.length > 0) {
+              const readyTranscription = transcriptions.find(t => t.url);
+              if (readyTranscription) {
+                const response = await fetch(readyTranscription.url);
+                if (response.ok) {
+                  const rawText = await response.text();
+                  const lines = rawText.split('\n').filter(line => line.trim() !== '');
+                  
+                  const transcriptParts = lines.map(line => {
+                    try {
+                      const parsed = JSON.parse(line);
+                      return `${parsed.speaker_id || 'Unknown'}: ${parsed.text}`;
+                    } catch (e) {
+                      return null;
                     }
-                    return null;
-                  } catch (e) {
-                    return null;
-                  }
-                }).filter(Boolean);
+                  }).filter(Boolean);
 
-                session.transcript = transcriptParts.join('\n');
-                session.transcriptSegments = transcriptSegments;
-                if (session.transcript.trim().length === 0) {
-                  session.transcript = "No speech was detected during this meeting. It was likely a silent or very brief session.";
+                  const transcriptSegments = lines.map(line => {
+                    try {
+                      const parsed = JSON.parse(line);
+                      if (parsed && parsed.text) {
+                        return {
+                          speakerId: parsed.speaker_id || null,
+                          text: parsed.text,
+                          timestamp: session.transcriptionStartedAt && typeof parsed.start_ts === 'number'
+                            ? new Date(session.transcriptionStartedAt.getTime() + parsed.start_ts)
+                            : null
+                        };
+                      }
+                      return null;
+                    } catch (e) {
+                      return null;
+                    }
+                  }).filter(Boolean);
+
+                  session.transcript = transcriptParts.join('\n');
+                  session.transcriptSegments = transcriptSegments;
+                  if (session.transcript.trim().length === 0) {
+                    session.transcript = "No speech was detected during this meeting. It was likely a silent or very brief session.";
+                  }
+                  await session.save();
                 }
-                await session.save();
               }
             }
           }

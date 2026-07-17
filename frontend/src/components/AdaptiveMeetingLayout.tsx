@@ -87,7 +87,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
           {hiddenCount > 0 && (
             <div className="hidden">
               {orderedParticipants.slice(-hiddenCount).map(p => (
-                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} />
               ))}
             </div>
           )}
@@ -99,12 +99,12 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
     const orderedParticipants = [...remoteParticipants, localParticipant].filter((p): p is StreamVideoParticipant => !!p);
 
     let stripContent;
+    let hiddenCount = 0;
 
     if (isSidebarOpen || orderedParticipants.length <= 2) {
       // Vertical Stack
       const MAX_VISIBLE = 4;
       let visibleParticipants = orderedParticipants;
-      let hiddenCount = 0;
       
       if (orderedParticipants.length > MAX_VISIBLE) {
         const visibleRemotes = remoteParticipants.slice(0, 3);
@@ -182,7 +182,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
           {hiddenCount > 0 && (
             <div className="hidden">
               {orderedParticipants.slice(-hiddenCount).map(p => (
-                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} />
               ))}
             </div>
           )}
@@ -255,7 +255,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
         {hiddenCount > 0 && (
           <div className="hidden">
             {orderedParticipants.slice(-hiddenCount).map(p => (
-              <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+              <ParticipantView key={`hidden-${p.sessionId}`} participant={p} />
             ))}
           </div>
         )}

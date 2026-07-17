@@ -1224,7 +1224,7 @@ function MeetingRoomContent({
       {/* Control Bar */}
       <div className={`h-[80px] bg-[#0F172A] border-t border-[#1E293B] flex items-center justify-between md:justify-center px-2 md:px-6 md:relative absolute bottom-0 w-full z-20 transition-transform duration-300 flex-shrink-0 ${!isMobile || controlsVisible ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="flex-1 md:flex-initial relative md:static overflow-hidden md:overflow-visible mr-2 md:mr-0">
-          <div className="w-full h-full flex items-center justify-start md:justify-center gap-2 md:gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pr-8 md:pr-0">
+          <div className="w-full h-full flex items-center justify-start md:justify-center gap-2 md:gap-4 overflow-x-auto md:overflow-visible [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pr-8 md:pr-0">
             {/* Mic Group */}
             <div ref={micPanelRef} className={`relative flex items-center rounded-full transition-colors flex-shrink-0 ${isMicMuted ? 'bg-[#EF4444]' : 'bg-[#334155]'}`}>
               <button 

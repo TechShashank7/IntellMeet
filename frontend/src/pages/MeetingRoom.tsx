@@ -430,8 +430,9 @@ function MeetingRoomContent({
   meetingId: string | undefined;
   callId: string | undefined;
 }) {
-  const { useIsCallCaptioningInProgress, useMicrophoneState, useCameraState, useScreenShareState, useCallCallingState } = useCallStateHooks();
+  const { useIsCallCaptioningInProgress, useMicrophoneState, useCameraState, useScreenShareState, useCallCallingState, useParticipants } = useCallStateHooks();
   const callingState = useCallCallingState();
+  const participants = useParticipants();
   const captionsEnabled = useIsCallCaptioningInProgress();
   const { microphone, isMute: isMicMuted, devices: micDevices, selectedDevice: selectedMic } = useMicrophoneState();
   const { camera, isMute: isCamMuted, devices: camDevices, selectedDevice: selectedCam } = useCameraState();
@@ -1383,16 +1384,18 @@ function MeetingRoomContent({
             <div className="fixed md:absolute bottom-[90px] md:bottom-[110%] right-4 md:left-1/2 md:-translate-x-1/2 md:right-auto w-56 bg-[#1E293B] border border-[#334155] rounded-xl shadow-xl p-2 z-30">
               <button
                 onClick={handleEndForAll}
-                className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-lg transition-colors mb-1.5"
+                className={`w-full text-left px-3 py-2.5 text-[13px] font-medium text-white bg-[#EF4444] hover:bg-[#DC2626] rounded-lg transition-colors ${participants.length > 1 ? 'mb-1.5' : ''}`}
               >
                 End meeting for all
               </button>
-              <button
-                onClick={handleLeaveMeeting}
-                className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-[#E2E8F0] hover:bg-[#334155] rounded-lg transition-colors"
-              >
-                Leave meeting
-              </button>
+              {participants.length > 1 && (
+                <button
+                  onClick={handleLeaveMeeting}
+                  className="w-full text-left px-3 py-2.5 text-[13px] font-medium text-[#E2E8F0] hover:bg-[#334155] rounded-lg transition-colors"
+                >
+                  Leave meeting
+                </button>
+              )}
             </div>
           )}
         </div>

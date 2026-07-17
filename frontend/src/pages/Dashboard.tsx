@@ -940,7 +940,7 @@ export default function Dashboard() {
                         {isMeetingHost ? (
                           <div className="flex items-center gap-2 ml-1">
                             <button
-                              onClick={() => handleJoinMeeting(meeting.id)}
+                              onClick={() => handleJoinMeeting(meeting.joinCode || meeting.id)}
                               className="h-[32px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[6px] text-[13px] font-[500] transition-colors"
                             >
                               Start
@@ -958,7 +958,7 @@ export default function Dashboard() {
                           </div>
                         ) : canJoinNow(meeting) ? (
                           <button 
-                            onClick={() => handleJoinMeeting(meeting.id)}
+                            onClick={() => handleJoinMeeting(meeting.joinCode || meeting.id)}
                             className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
                           >
                             Join
@@ -1933,7 +1933,7 @@ export default function Dashboard() {
                       {isMeetingHost ? (
                         <div className="flex items-center gap-2 ml-1">
                           <button
-                            onClick={() => handleJoinMeeting(meeting.id)}
+                            onClick={() => handleJoinMeeting(meeting.joinCode || meeting.id)}
                             className="h-[32px] px-4 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-[6px] text-[13px] font-[500] transition-colors"
                           >
                             Start
@@ -1951,7 +1951,7 @@ export default function Dashboard() {
                         </div>
                       ) : canJoinNow(meeting) ? (
                         <button 
-                          onClick={() => handleJoinMeeting(meeting.id)}
+                          onClick={() => handleJoinMeeting(meeting.joinCode || meeting.id)}
                           className="opacity-0 group-hover:opacity-100 h-[32px] px-3 bg-transparent border border-[#4F46E5] text-[#4F46E5] rounded-[6px] hover:bg-[#EEF2FF] text-[13px] font-[500] transition-all ml-2"
                         >
                           Join

@@ -39,7 +39,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
     if (participants.length === 1) {
       return (
         <div className="w-full h-full relative rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-contain">
-          <ParticipantView participant={activeSharer} trackType="screenShareTrack" />
+          <ParticipantView participant={activeSharer} trackType="screenShareTrack" muteAudio={true} />
         </div>
       );
     }
@@ -60,7 +60,7 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
         <div className="flex flex-col w-full h-full gap-2 min-h-0">
           {/* Main Screen Share Area */}
           <div className="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#0F172A] [&_video]:!object-contain relative">
-            <ParticipantView participant={activeSharer} trackType="screenShareTrack" />
+            <ParticipantView participant={activeSharer} trackType="screenShareTrack" muteAudio={true} />
           </div>
           
           {/* Bottom Strip */}
@@ -82,6 +82,15 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
               );
             })}
           </div>
+          
+          {/* Hidden Participants for Audio Bindings */}
+          {hiddenCount > 0 && (
+            <div className="hidden">
+              {orderedParticipants.slice(-hiddenCount).map(p => (
+                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -162,12 +171,21 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
       <div className="flex w-full h-full gap-2">
         {/* Main Screen Share Area */}
         <div className={`${isSidebarOpen ? 'basis-3/4' : 'basis-[65%]'} shrink-0 h-full rounded-lg overflow-hidden bg-[#0F172A] [&_video]:!object-contain`}>
-          <ParticipantView participant={activeSharer} trackType="screenShareTrack" />
+          <ParticipantView participant={activeSharer} trackType="screenShareTrack" muteAudio={true} />
         </div>
         
         {/* Strip container */}
         <div className="flex-1 h-full min-w-0">
           {stripContent}
+          
+          {/* Hidden Participants for Audio Bindings */}
+          {hiddenCount > 0 && (
+            <div className="hidden">
+              {orderedParticipants.slice(-hiddenCount).map(p => (
+                <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -232,6 +250,15 @@ export default function AdaptiveMeetingLayout({ isSidebarOpen = true, onShowPart
             </div>
           );
         })}
+        
+        {/* Hidden Participants for Audio Bindings */}
+        {hiddenCount > 0 && (
+          <div className="hidden">
+            {orderedParticipants.slice(-hiddenCount).map(p => (
+              <ParticipantView key={`hidden-${p.sessionId}`} participant={p} trackType="audioTrack" />
+            ))}
+          </div>
+        )}
       </div>
     );
   }

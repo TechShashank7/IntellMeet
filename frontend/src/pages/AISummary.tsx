@@ -330,7 +330,12 @@ export default function AISummary() {
               Executive Summary
             </h2>
             <div className="text-[15px] text-[#374151] leading-relaxed space-y-4">
-              {(aiData?.status === 'pending' || aiData?.status === 'processing') ? (
+              {meeting?.status === 'active' ? (
+                <div className="flex items-center gap-3 text-[#6B7280]">
+                  <div className="w-4 h-4 rounded-full border-2 border-[#F59E0B] border-t-transparent animate-spin"></div>
+                  This meeting is still in progress. The summary will be generated after the meeting ends.
+                </div>
+              ) : (aiData?.status === 'pending' || aiData?.status === 'processing') ? (
                 <div className="flex items-center gap-3 text-[#6B7280]">
                   <div className="w-4 h-4 rounded-full border-2 border-[#4F46E5] border-t-transparent animate-spin"></div>
                   Generating summary — this usually takes a minute or two...
@@ -352,7 +357,9 @@ export default function AISummary() {
               Action Items
             </h2>
             <div className="space-y-3">
-              {mappedActionItems.length ? mappedActionItems.map((item: any) => {
+              {meeting?.status === 'active' ? (
+                <p className="text-[13px] text-[#6B7280] italic">Action items will be extracted after the meeting ends.</p>
+              ) : mappedActionItems.length ? mappedActionItems.map((item: any) => {
                 const assigneeDateNode = (
                   <>
                     <div className="flex items-center gap-1.5">

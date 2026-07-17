@@ -805,7 +805,11 @@ function MeetingRoomContent({
 
   const handleEndCallButtonClick = () => {
     if (isHost) {
-      setShowEndCallPopup(prev => !prev);
+      if (participants.length === 1) {
+        handleEndForAll();
+      } else {
+        setShowEndCallPopup(prev => !prev);
+      }
     } else {
       handleLeaveMeeting();
     }

@@ -1454,7 +1454,7 @@ export default function Dashboard() {
                             {meeting.summary || 'Summary pending'}
                           </p>
                         </div>
-                        <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0 ml-4">
+                        <span className="bg-[#F3F4F6] text-[#4B5563] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0 ml-4">
                           {dateLabel}
                         </span>
                       </div>
@@ -2101,7 +2101,7 @@ export default function Dashboard() {
                         <div key={email.id} className="flex items-center gap-2">
                           <span className="text-[14px] text-[#111827]">{email.emailAddress}</span>
                           {email.id === user.primaryEmailAddressId && (
-                            <span className="bg-[#F3F4F6] text-[#6B7280] text-[11px] font-[500] px-2 py-0.5 rounded-full">
+                            <span className="bg-[#F3F4F6] text-[#4B5563] text-[11px] font-[500] px-2 py-0.5 rounded-full">
                               Primary
                             </span>
                           )}
@@ -2311,7 +2311,7 @@ export default function Dashboard() {
         <div className="hidden md:flex gap-[24px] mt-[24px]">
           {/* Card 1 */}
           <div className="flex-1 bg-[#FFFFFF] p-[20px] rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
-            <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Meetings This Week</h3>
+            <h2 className="text-[#6B7280] text-[13px] font-[400] mb-2">Meetings This Week</h2>
             <div className="flex items-baseline gap-3">
               <span className="text-[28px] font-[700] text-[#111827] leading-none">
                 {meetingStats?.thisWeekCount ?? 0}
@@ -2320,7 +2320,7 @@ export default function Dashboard() {
                 className={
                   weekDelta >= 0
                     ? 'bg-[#D1FAE5] text-[#065F46] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]'
-                    : 'bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]'
+                    : 'bg-[#F3F4F6] text-[#4B5563] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px]'
                 }
               >
                 {weekDelta > 0
@@ -2333,7 +2333,7 @@ export default function Dashboard() {
           </div>
           {/* Card 2 */}
           <div className="flex-1 bg-[#FFFFFF] p-[20px] rounded-[12px] border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.04)] relative">
-            <h3 className="text-[#6B7280] text-[13px] font-[400] mb-2">Open Action Items</h3>
+            <h2 className="text-[#6B7280] text-[13px] font-[400] mb-2">Open Action Items</h2>
             <div className="flex items-baseline gap-3">
               <span className="text-[28px] font-[700] text-[#111827] leading-none">
                 {myOpenTasks.length}
@@ -2360,7 +2360,10 @@ export default function Dashboard() {
             className="flex flex-col items-center gap-2 cursor-pointer group"
             onClick={handleNewMeeting}
           >
-            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+            <button
+              className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all"
+              aria-label="New Meeting"
+            >
               <Video size={24} className="text-[#4F46E5]" />
             </button>
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">
@@ -2372,7 +2375,10 @@ export default function Dashboard() {
             className="flex flex-col items-center gap-2 cursor-pointer group"
             onClick={handleJoinWithCode}
           >
-            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+            <button
+              className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all"
+              aria-label="Join with Code"
+            >
               <LogIn size={24} className="text-[#4F46E5]" />
             </button>
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">
@@ -2388,7 +2394,10 @@ export default function Dashboard() {
               setIsScheduleModalOpen(true);
             }}
           >
-            <button className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all">
+            <button
+              className="w-[80px] h-[80px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center group-hover:bg-[#F5F3FF] group-hover:border-[#C7D2FE] hover:bg-[#F5F3FF] hover:border-[#C7D2FE] transition-all"
+              aria-label="Schedule Meeting"
+            >
               <Calendar size={24} className="text-[#4F46E5]" />
             </button>
             <span className="text-[12px] font-[500] text-[#374151] group-hover:text-[#4F46E5] transition-colors">
@@ -2867,7 +2876,7 @@ export default function Dashboard() {
                             {summary.title}
                           </h4>
                         </div>
-                        <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
+                        <span className="bg-[#F3F4F6] text-[#4B5563] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
                           {dateLabel}
                         </span>
                       </div>
@@ -2932,6 +2941,7 @@ export default function Dashboard() {
                         type="checkbox"
                         checked={false}
                         onChange={() => completeTask(task.id)}
+                        aria-label="Mark task as complete"
                         className="w-[16px] h-[16px] border border-[#D1D5DB] rounded-[4px] text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer appearance-none checked:bg-[#4F46E5] checked:border-transparent flex-shrink-0 relative checked:after:content-['✓'] checked:after:absolute checked:after:text-white checked:after:text-[10px] checked:after:left-[3px] checked:after:top-[0px]"
                       />
                       <div className="flex items-center gap-3 min-w-0">
@@ -2939,7 +2949,7 @@ export default function Dashboard() {
                           {task.title}
                         </span>
                         {task.sourceMeetingTitle && (
-                          <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
+                          <span className="bg-[#F3F4F6] text-[#4B5563] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
                             From: {task.sourceMeetingTitle}
                           </span>
                         )}

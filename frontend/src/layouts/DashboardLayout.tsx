@@ -298,17 +298,17 @@ export default function DashboardLayout() {
             <div className="text-[#111827] text-[13px] font-medium truncate">
               {user?.fullName || 'User'}
             </div>
-            <div className="text-[#9CA3AF] text-[12px] truncate">
+            <div className="text-[#6B7280] text-[12px] truncate">
               {user?.primaryEmailAddress?.emailAddress || 'user@example.com'}
             </div>
           </div>
-          <button className="text-[#9CA3AF] hover:text-[#6B7280]">
+          <button className="text-[#6B7280] hover:text-[#4B5563]" aria-label="More options">
             <MoreHorizontal size={15} />
           </button>
         </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-[#EF4444] text-[12px] hover:bg-[#FEF2F2] px-2 py-1.5 rounded-md mt-1 transition-colors"
+          className="flex items-center gap-2 text-[#DC2626] text-[12px] hover:bg-[#FEF2F2] px-2 py-1.5 rounded-md mt-1 transition-colors"
         >
           <LogOut size={14} />
           Sign out

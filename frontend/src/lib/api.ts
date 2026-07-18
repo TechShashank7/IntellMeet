@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 // Set to 0 to test without delay, or remove when swapping for real API.
 const SIMULATED_DELAY = 300;
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -24,14 +24,14 @@ function mapSessionToMeeting(session: any): Meeting {
       meeting: session.topic || 'Meeting',
       assignee: { name: 'Unassigned', initials: '?', color: '#9CA3AF' },
       dueDate: ai.dueDate ? format(new Date(ai.dueDate), 'MMM d') : 'No due date',
-      isOverdue: ai.dueDate ? new Date(ai.dueDate) < new Date() : false
+      isOverdue: ai.dueDate ? new Date(ai.dueDate) < new Date() : false,
     })),
     attendees: (session.resolvedParticipants || []).map((u: any) => ({
       name: u.name,
       initials: getInitials(u.name),
       color: getAvatarColor(u.clerkId),
       clerkId: u.clerkId,
-      profileImage: u.profileImage || ''
+      profileImage: u.profileImage || '',
     })),
     startTime: session.startTime,
     endTime: session.endTime,
@@ -46,8 +46,8 @@ function mapSessionToMeeting(session: any): Meeting {
       initials: getInitials(u.name),
       color: getAvatarColor(u.clerkId),
       clerkId: u.clerkId,
-      profileImage: u.profileImage || ''
-    }))
+      profileImage: u.profileImage || '',
+    })),
   };
 }
 
@@ -66,7 +66,7 @@ export const api = {
       // Fall back to existing mock team data (or a safe default if none existed)
       return [
         { _id: '1', name: 'Product Team' },
-        { _id: '2', name: 'Engineering' }
+        { _id: '2', name: 'Engineering' },
       ];
     }
   },
@@ -78,7 +78,7 @@ export const api = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name }),
     });
     if (!res.ok) throw new Error('Failed to create team');
     return await res.json();
@@ -88,7 +88,7 @@ export const api = {
     console.log('getTeamMembers called with teamId:', teamId);
     try {
       const res = await fetch(`${API_BASE_URL}/teams/${teamId}/members`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       console.log('getTeamMembers response status:', res.status, 'data:', data);
@@ -100,17 +100,21 @@ export const api = {
     }
   },
 
-  inviteTeamMember: async (teamId: string, token: string, email: string): Promise<{ success: boolean; message: string }> => {
+  inviteTeamMember: async (
+    teamId: string,
+    token: string,
+    email: string
+  ): Promise<{ success: boolean; message: string }> => {
     try {
       const res = await fetch(`${API_BASE_URL}/teams/${teamId}/members/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
       });
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         return { success: false, message: data.message || 'Failed to invite team member' };
@@ -123,7 +127,9 @@ export const api = {
 
   getMyInvites: async (token: string): Promise<any[]> => {
     try {
-      const res = await fetch(`${API_BASE_URL}/invites`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE_URL}/invites`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) throw new Error('Failed to fetch invites');
       return await res.json();
     } catch (err) {
@@ -132,17 +138,23 @@ export const api = {
     }
   },
 
-  respondToInvite: async (id: string, action: 'accept' | 'decline', token: string): Promise<void> => {
+  respondToInvite: async (
+    id: string,
+    action: 'accept' | 'decline',
+    token: string
+  ): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/invites/${id}/${action}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Failed to ${action} invite`);
   },
 
   getMyMeetingInvites: async (token: string): Promise<any[]> => {
     try {
-      const res = await fetch(`${API_BASE_URL}/meetings/invites/my`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE_URL}/meetings/invites/my`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) throw new Error('Failed to fetch meeting invites');
       return await res.json();
     } catch (err) {
@@ -151,10 +163,14 @@ export const api = {
     }
   },
 
-  respondToMeetingInvite: async (id: string, action: 'accept' | 'decline', token: string): Promise<void> => {
+  respondToMeetingInvite: async (
+    id: string,
+    action: 'accept' | 'decline',
+    token: string
+  ): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/invites/${id}/${action}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Failed to ${action} meeting invite`);
   },
@@ -162,7 +178,7 @@ export const api = {
   leaveTeam: async (teamId: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/teams/${teamId}/leave`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -173,7 +189,7 @@ export const api = {
   removeTeamMember: async (teamId: string, clerkId: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/teams/${teamId}/members/${clerkId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -181,14 +197,18 @@ export const api = {
     }
   },
 
-  updateTeamIntegrations: async (teamId: string, token: string, updates: { slackWebhookUrl?: string, notionToken?: string, notionPageId?: string }): Promise<any> => {
+  updateTeamIntegrations: async (
+    teamId: string,
+    token: string,
+    updates: { slackWebhookUrl?: string; notionToken?: string; notionPageId?: string }
+  ): Promise<any> => {
     const res = await fetch(`${API_BASE_URL}/teams/${teamId}/integrations`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -197,9 +217,11 @@ export const api = {
     return await res.json();
   },
 
-  getStreamToken: async (token: string): Promise<{ token: string; userId: string; userName: string; userImage: string }> => {
+  getStreamToken: async (
+    token: string
+  ): Promise<{ token: string; userId: string; userName: string; userImage: string }> => {
     const res = await fetch(`${API_BASE_URL}/chat/token`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to get Stream token');
     return await res.json();
@@ -209,25 +231,31 @@ export const api = {
     try {
       await fetch(`${API_BASE_URL}/meetings/${id}/join`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
     } catch (err) {
       console.warn('Failed to join meeting on backend', err);
     }
   },
 
-  requestToJoinMeeting: async (id: string, token: string): Promise<{ status: 'admitted' | 'waiting' | 'denied' }> => {
+  requestToJoinMeeting: async (
+    id: string,
+    token: string
+  ): Promise<{ status: 'admitted' | 'waiting' | 'denied' }> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room/request`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to request to join meeting');
     return await res.json();
   },
 
-  getWaitingRoomStatus: async (id: string, token: string): Promise<{ status: 'admitted' | 'waiting' | 'denied' }> => {
+  getWaitingRoomStatus: async (
+    id: string,
+    token: string
+  ): Promise<{ status: 'admitted' | 'waiting' | 'denied' }> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room/status`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to fetch waiting room status');
     return await res.json();
@@ -235,7 +263,7 @@ export const api = {
 
   getWaitingRoom: async (id: string, token: string): Promise<any[]> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to fetch waiting room');
     const data = await res.json();
@@ -245,7 +273,7 @@ export const api = {
   admitParticipant: async (id: string, clerkId: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room/${clerkId}/admit`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to admit participant');
   },
@@ -253,7 +281,7 @@ export const api = {
   denyParticipant: async (id: string, clerkId: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room/${clerkId}/deny`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to deny participant');
   },
@@ -261,7 +289,7 @@ export const api = {
   admitAllParticipants: async (id: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/waiting-room/admit-all`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to admit all participants');
   },
@@ -269,20 +297,24 @@ export const api = {
   endMeeting: async (id: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/end`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to end meeting on backend');
   },
 
-  rateMeeting: async (id: string, token: string, payload: { rating?: number; skipped?: boolean }): Promise<void> => {
+  rateMeeting: async (
+    id: string,
+    token: string,
+    payload: { rating?: number; skipped?: boolean }
+  ): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE_URL}/meetings/${id}/rate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Failed to rate meeting');
     } catch (err) {
@@ -290,9 +322,13 @@ export const api = {
     }
   },
 
-  getMeetingStats: async (token: string): Promise<{ thisWeekCount: number; lastWeekCount: number }> => {
+  getMeetingStats: async (
+    token: string
+  ): Promise<{ thisWeekCount: number; lastWeekCount: number }> => {
     try {
-      const res = await fetch(`${API_BASE_URL}/meetings/stats`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE_URL}/meetings/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) throw new Error('Failed to fetch meeting stats');
       return await res.json();
     } catch (err) {
@@ -305,17 +341,22 @@ export const api = {
     try {
       const qs = teamId ? `?teamId=${teamId}` : '';
       const res = await fetch(`${API_BASE_URL}/meetings/analytics${qs}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch analytics');
       return await res.json();
     } catch (err) {
       console.warn('Failed to fetch real analytics, falling back to empty', err);
       return {
-        totalMeetings: 0, avgDurationMinutes: 0, totalHours: 0, avgRating: null,
-        ratingCount: 0, ratingDistribution: [], weeklyTrend: [],
+        totalMeetings: 0,
+        avgDurationMinutes: 0,
+        totalHours: 0,
+        avgRating: null,
+        ratingCount: 0,
+        ratingDistribution: [],
+        weeklyTrend: [],
         engagement: { avgAttendeesPerMeeting: 0, ratingResponseRate: 0, topParticipants: [] },
-        productivity: null
+        productivity: null,
       };
     }
   },
@@ -326,20 +367,31 @@ export const api = {
     return useMeetingStore.getState().meetings;
   },
 
-  createMeeting: async (token: string, topic: string, options?: { scheduledFor?: string; participantClerkIds?: string[]; openForAll?: boolean; teamId?: string }): Promise<any> => {
+  createMeeting: async (
+    token: string,
+    topic: string,
+    options?: {
+      scheduledFor?: string;
+      participantClerkIds?: string[];
+      openForAll?: boolean;
+      teamId?: string;
+    }
+  ): Promise<any> => {
     const res = await fetch(`${API_BASE_URL}/meetings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ 
-        topic, 
+      body: JSON.stringify({
+        topic,
         openForAll: options?.openForAll ?? false,
         ...(options?.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
-        ...(options?.participantClerkIds?.length ? { participantClerkIds: options.participantClerkIds } : {}),
-        ...(options?.teamId ? { teamId: options.teamId } : {})
-      })
+        ...(options?.participantClerkIds?.length
+          ? { participantClerkIds: options.participantClerkIds }
+          : {}),
+        ...(options?.teamId ? { teamId: options.teamId } : {}),
+      }),
     });
     if (!res.ok) throw new Error('Failed to create meeting');
     const data = await res.json();
@@ -351,9 +403,9 @@ export const api = {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ openForAll })
+      body: JSON.stringify({ openForAll }),
     });
     if (!res.ok) throw new Error('Failed to update meeting setting');
   },
@@ -361,7 +413,7 @@ export const api = {
   getRecordingsList: async (token: string): Promise<any[]> => {
     try {
       const res = await fetch(`${API_BASE_URL}/meetings/recordings`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch recordings list');
       const data = await res.json();
@@ -374,7 +426,7 @@ export const api = {
 
   getRecordingDetail: async (id: string, token: string): Promise<any> => {
     const res = await fetch(`${API_BASE_URL}/meetings/recordings/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to fetch recording detail');
     return await res.json();
@@ -382,7 +434,7 @@ export const api = {
 
   downloadMeetingNotesPdf: async (id: string, token: string, filename: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/export`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to export meeting notes');
     const blob = await res.blob();
@@ -400,7 +452,7 @@ export const api = {
 
   downloadMeetingSummaryPdf: async (id: string, token: string, filename: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/export?type=summary`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to export meeting summary');
     const blob = await res.blob();
@@ -419,7 +471,7 @@ export const api = {
   shareMeetingToSlack: async (id: string, token: string): Promise<any> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/share/slack`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -431,7 +483,7 @@ export const api = {
   syncMeetingToNotion: async (id: string, token: string): Promise<any> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/share/notion`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -443,45 +495,53 @@ export const api = {
   getUpcomingMeetings: async (token: string): Promise<any[]> => {
     try {
       const res = await fetch(`${API_BASE_URL}/meetings/upcoming`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch upcoming meetings');
       const data = await res.json();
       return (data.sessions || []).map(mapSessionToMeeting);
     } catch (err) {
       console.warn('Failed to fetch real upcoming meetings, falling back to mock data', err);
-      return useMeetingStore.getState().meetings.filter(m => m.status === 'scheduled');
+      return useMeetingStore.getState().meetings.filter((m) => m.status === 'scheduled');
     }
   },
 
   deleteMeeting: async (id: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to delete meeting');
   },
 
-  inviteToMeeting: async (id: string, participantClerkIds: string[], token: string): Promise<void> => {
+  inviteToMeeting: async (
+    id: string,
+    participantClerkIds: string[],
+    token: string
+  ): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/invite`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ participantClerkIds })
+      body: JSON.stringify({ participantClerkIds }),
     });
     if (!res.ok) throw new Error('Failed to invite to meeting');
   },
 
-  removeMeetingParticipant: async (id: string, participantClerkId: string, token: string): Promise<void> => {
+  removeMeetingParticipant: async (
+    id: string,
+    participantClerkId: string,
+    token: string
+  ): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/remove`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ participantClerkId })
+      body: JSON.stringify({ participantClerkId }),
     });
     if (!res.ok) throw new Error('Failed to remove participant');
   },
@@ -489,7 +549,7 @@ export const api = {
   leaveMeeting: async (id: string, token: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/meetings/${id}/leave`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to leave meeting');
   },
@@ -497,22 +557,22 @@ export const api = {
   getRecentMeetings: async (token: string): Promise<any[]> => {
     try {
       const res = await fetch(`${API_BASE_URL}/meetings/my-recent`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch recent meetings');
       const data = await res.json();
       return (data.sessions || []).map(mapSessionToMeeting);
     } catch (err) {
       console.warn('Failed to fetch real recent meetings, falling back to mock data', err);
-      return useMeetingStore.getState().meetings.filter(m => m.status === 'completed');
+      return useMeetingStore.getState().meetings.filter((m) => m.status === 'completed');
     }
   },
-  
+
   getMeeting: async (id: string, token?: string | null): Promise<Meeting | undefined> => {
     if (token) {
       try {
         const res = await fetch(`${API_BASE_URL}/meetings/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
@@ -523,26 +583,29 @@ export const api = {
       }
     }
     await delay(SIMULATED_DELAY);
-    return useMeetingStore.getState().meetings.find(m => m.id === id);
+    return useMeetingStore.getState().meetings.find((m) => m.id === id);
   },
 
-  getAISummary: async (meetingId: string, token: string): Promise<{ summary?: string; actionItems: any[]; status?: string }> => {
+  getAISummary: async (
+    meetingId: string,
+    token: string
+  ): Promise<{ summary?: string; actionItems: any[]; status?: string }> => {
     try {
       const res = await fetch(`${API_BASE_URL}/ai/meetings/${meetingId}/summary`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch AI summary');
       return await res.json();
     } catch (err) {
       console.warn('Failed to fetch real AI summary, falling back to mock data', err);
       await delay(SIMULATED_DELAY);
-      const meeting = useMeetingStore.getState().meetings.find(m => m.id === meetingId);
+      const meeting = useMeetingStore.getState().meetings.find((m) => m.id === meetingId);
       if (!meeting) {
-        throw new Error("Meeting not found");
+        throw new Error('Meeting not found');
       }
       return {
         summary: meeting.summary,
-        actionItems: meeting.actionItems
+        actionItems: meeting.actionItems,
       };
     }
   },
@@ -551,7 +614,7 @@ export const api = {
   getTasks: async (teamId: string, token: string): Promise<Task[]> => {
     try {
       const res = await fetch(`${API_BASE_URL}/teams/${teamId}/tasks`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch tasks');
       const data = await res.json();
@@ -560,15 +623,26 @@ export const api = {
         if (t.status === 'in_progress') frontendStatus = 'in-progress';
         else if (t.status === 'in_review') frontendStatus = 'in-review';
         else if (t.status === 'done') frontendStatus = 'done';
-        
-        let assignee: { name: string; initials: string; color: string; clerkId?: string; profileImage?: string } = { name: 'Unassigned', initials: '?', color: '#9CA3AF', clerkId: t.assignee || undefined };
+
+        let assignee: {
+          name: string;
+          initials: string;
+          color: string;
+          clerkId?: string;
+          profileImage?: string;
+        } = {
+          name: 'Unassigned',
+          initials: '?',
+          color: '#9CA3AF',
+          clerkId: t.assignee || undefined,
+        };
         if (t.assigneeInfo) {
           assignee = {
             name: t.assigneeInfo.name,
             initials: getInitials(t.assigneeInfo.name),
             color: getAvatarColor(t.assigneeInfo.clerkId),
             clerkId: t.assigneeInfo.clerkId,
-            profileImage: t.assigneeInfo.profileImage || undefined
+            profileImage: t.assigneeInfo.profileImage || undefined,
           };
         }
 
@@ -583,7 +657,7 @@ export const api = {
           dueDate: t.dueDate || null,
           sourceActionItem: t.sourceActionItem || undefined,
           sourceMeetingId: t.sourceMeetingId || undefined,
-          comments: t.comments || []
+          comments: t.comments || [],
         };
       });
     } catch (err) {
@@ -591,21 +665,21 @@ export const api = {
       return useTaskStore.getState().tasks;
     }
   },
-  
+
   updateTaskStatus: async (id: string, status: Task['status'], token: string): Promise<void> => {
     try {
       let backendStatus = 'todo';
       if (status === 'in-progress') backendStatus = 'in_progress';
       else if (status === 'in-review') backendStatus = 'in_review';
       else if (status === 'done') backendStatus = 'done';
-      
+
       const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: backendStatus })
+        body: JSON.stringify({ status: backendStatus }),
       });
       if (!res.ok) throw new Error('Failed to update task status');
     } catch (err) {
@@ -613,16 +687,27 @@ export const api = {
       useTaskStore.getState().updateTaskStatus(id, status);
     }
   },
-  
-  addTask: async (teamId: string, token: string, task: { title: string; assignee?: string | null; dueDate?: string | null; priority?: 'low' | 'medium' | 'high'; sourceActionItem?: string; sourceMeetingId?: string }): Promise<void> => {
+
+  addTask: async (
+    teamId: string,
+    token: string,
+    task: {
+      title: string;
+      assignee?: string | null;
+      dueDate?: string | null;
+      priority?: 'low' | 'medium' | 'high';
+      sourceActionItem?: string;
+      sourceMeetingId?: string;
+    }
+  ): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE_URL}/teams/${teamId}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(task)
+        body: JSON.stringify(task),
       });
       if (!res.ok) throw new Error('Failed to add task');
     } catch (err) {
@@ -633,20 +718,30 @@ export const api = {
         status: 'backlog',
         priority: task.priority || 'medium',
         due: task.dueDate ? format(new Date(task.dueDate), 'MMM d') : 'No due date',
-        assignee: { name: task.assignee || 'Unassigned', initials: '?', color: '#9CA3AF' }
+        assignee: { name: task.assignee || 'Unassigned', initials: '?', color: '#9CA3AF' },
       });
     }
   },
 
-  updateTask: async (id: string, token: string, updates: { title?: string; description?: string; assignee?: string | null; dueDate?: string | null; priority?: string }): Promise<void> => {
+  updateTask: async (
+    id: string,
+    token: string,
+    updates: {
+      title?: string;
+      description?: string;
+      assignee?: string | null;
+      dueDate?: string | null;
+      priority?: string;
+    }
+  ): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(updates),
       });
       if (!res.ok) throw new Error('Failed to update task');
     } catch (err) {
@@ -658,8 +753,8 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
     if (!res.ok) throw new Error('Failed to delete task');
   },
@@ -669,11 +764,11 @@ export const api = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text }),
     });
     if (!res.ok) throw new Error('Failed to add task comment');
     return await res.json();
-  }
+  },
 };

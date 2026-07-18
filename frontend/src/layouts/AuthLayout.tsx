@@ -27,24 +27,25 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
               </span>
             </h1>
             <p className="text-lg text-zinc-400 leading-relaxed font-medium">
-              Elevate your team's productivity with automatic summaries, intelligent task extraction, and crystal clear video.
+              Elevate your team's productivity with automatic summaries, intelligent task
+              extraction, and crystal clear video.
             </p>
 
             <div className="space-y-5 pt-4">
-              <FeatureItem 
-                icon={<Video className="w-5 h-5 text-primary" />} 
-                title="Crystal Clear Meetings" 
-                desc="Ultra-low latency meetings." 
+              <FeatureItem
+                icon={<Video className="w-5 h-5 text-primary" />}
+                title="Crystal Clear Meetings"
+                desc="Ultra-low latency meetings."
               />
-              <FeatureItem 
-                icon={<MessageSquareText className="w-5 h-5 text-primary" />} 
-                title="Live Transcriptions" 
-                desc="Accurate captions." 
+              <FeatureItem
+                icon={<MessageSquareText className="w-5 h-5 text-primary" />}
+                title="Live Transcriptions"
+                desc="Accurate captions."
               />
-              <FeatureItem 
-                icon={<FileText className="w-5 h-5 text-primary" />} 
-                title="Automated Action Items" 
-                desc="Never lose track of tasks discussed during calls." 
+              <FeatureItem
+                icon={<FileText className="w-5 h-5 text-primary" />}
+                title="Automated Action Items"
+                desc="Never lose track of tasks discussed during calls."
               />
             </div>
           </div>
@@ -57,8 +58,8 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Right Panel: Auth Form container */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 lg:p-12 relative">
-         {/* Optional subtle accent on right side */}
-         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+        {/* Optional subtle accent on right side */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
         {/* Mobile Logo */}
         <div className="lg:hidden mb-8 flex items-center gap-2 z-10">
@@ -68,19 +69,23 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
           <span className="text-2xl font-bold tracking-tight text-zinc-900">IntellMeet</span>
         </div>
 
-        <div className="w-full max-w-md z-10">
-          {children}
-        </div>
+        <div className="w-full max-w-md z-10">{children}</div>
       </div>
     </div>
   );
 };
 
-const FeatureItem = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
+const FeatureItem = ({
+  icon,
+  title,
+  desc,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) => (
   <div className="flex items-start gap-4">
-    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shadow-inner">
-      {icon}
-    </div>
+    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shadow-inner">{icon}</div>
     <div>
       <h3 className="font-semibold text-zinc-100">{title}</h3>
       <p className="text-sm text-zinc-400 mt-1">{desc}</p>

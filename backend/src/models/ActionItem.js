@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 /**
  * ActionItem is a single follow-up task extracted by Gemini from a
@@ -10,7 +10,7 @@ const actionItemSchema = new mongoose.Schema(
   {
     meetingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Session",
+      ref: 'Session',
       required: true,
       index: true,
     },
@@ -25,8 +25,8 @@ const actionItemSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "in_progress", "done"],
-      default: "pending",
+      enum: ['pending', 'in_progress', 'done'],
+      default: 'pending',
     },
     dueDate: {
       type: Date,
@@ -34,10 +34,10 @@ const actionItemSchema = new mongoose.Schema(
     },
     sourceConfidence: {
       type: String, // AI's own confidence label, e.g. "high" | "medium" | "low"
-      default: "medium",
+      default: 'medium',
     },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("ActionItem", actionItemSchema);
+export default mongoose.model('ActionItem', actionItemSchema);

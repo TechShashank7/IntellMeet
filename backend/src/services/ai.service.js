@@ -1,6 +1,6 @@
-import { geminiModel } from "../config/gemini.js";
-import Meeting from "../models/Session.js";
-import ActionItem from "../models/ActionItem.js";
+import { geminiModel } from '../config/gemini.js';
+import Meeting from '../models/Session.js';
+import ActionItem from '../models/ActionItem.js';
 
 /**
  * Sends a meeting transcript to Gemini and asks for a structured
@@ -16,7 +16,7 @@ import ActionItem from "../models/ActionItem.js";
  */
 const generateMeetingSummary = async (transcript) => {
   if (!transcript || transcript.trim().length === 0) {
-    throw new Error("Cannot summarize an empty transcript");
+    throw new Error('Cannot summarize an empty transcript');
   }
 
   const prompt = `
@@ -56,15 +56,15 @@ ${transcript}
       try {
         parsed = JSON.parse(jsonMatch[0]);
       } catch (innerErr) {
-        throw new Error("Failed to parse extracted JSON from Gemini response");
+        throw new Error('Failed to parse extracted JSON from Gemini response');
       }
     } else {
-      throw new Error("Could not find valid JSON object in Gemini response");
+      throw new Error('Could not find valid JSON object in Gemini response');
     }
   }
 
   return {
-    summary: parsed.summary || "",
+    summary: parsed.summary || '',
     actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
   };
 };
@@ -88,10 +88,10 @@ const summarizeAndPersist = async (meetingId) => {
   }
 
   if (!meeting.transcript || meeting.transcript.trim().length === 0) {
-    throw new Error("Session has no transcript yet — nothing to summarize");
+    throw new Error('Session has no transcript yet — nothing to summarize');
   }
 
-  meeting.aiProcessingStatus = "processing";
+  meeting.aiProcessingStatus = 'processing';
   await meeting.save();
 
   const { summary, actionItems } = await generateMeetingSummary(meeting.transcript);
@@ -103,9 +103,12 @@ const summarizeAndPersist = async (meetingId) => {
     actionItems.map((item) => ({
       meetingId: meeting._id,
       text: item.text,
-      assignee: item.assignee === "null" || item.assignee === "N/A" || item.assignee === "None" ? null : (item.assignee || null),
-      dueDate: (item.dueDate && !isNaN(Date.parse(item.dueDate))) ? item.dueDate : null,
-      sourceConfidence: item.confidence || "medium",
+      assignee:
+        item.assignee === 'null' || item.assignee === 'N/A' || item.assignee === 'None'
+          ? null
+          : item.assignee || null,
+      dueDate: item.dueDate && !isNaN(Date.parse(item.dueDate)) ? item.dueDate : null,
+      sourceConfidence: item.confidence || 'medium',
     }))
   );
 
@@ -113,8 +116,8 @@ const summarizeAndPersist = async (meetingId) => {
     $set: {
       summary: summary,
       actionItems: createdActionItems.map((ai) => ai._id),
-      aiProcessingStatus: "completed"
-    }
+      aiProcessingStatus: 'completed',
+    },
   });
 
   return { summary, actionItems: createdActionItems };

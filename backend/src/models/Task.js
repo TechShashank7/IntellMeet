@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 /**
  * Task is a Kanban-board item. It can be created manually by a user,
@@ -13,11 +13,11 @@ const taskSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      default: "",
+      default: '',
     },
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Team",
+      ref: 'Team',
       required: true,
       index: true,
     },
@@ -27,13 +27,13 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["todo", "in_progress", "in_review", "done"],
-      default: "todo",
+      enum: ['todo', 'in_progress', 'in_review', 'done'],
+      default: 'todo',
     },
     priority: {
       type: String,
-      enum: ["low", "medium", "high"],
-      default: "medium",
+      enum: ['low', 'medium', 'high'],
+      default: 'medium',
     },
     dueDate: {
       type: Date,
@@ -41,12 +41,12 @@ const taskSchema = new mongoose.Schema(
     },
     sourceActionItem: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "ActionItem",
+      ref: 'ActionItem',
       default: null,
     },
     sourceMeetingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Meeting",
+      ref: 'Meeting',
       default: null,
     },
     comments: [
@@ -54,10 +54,10 @@ const taskSchema = new mongoose.Schema(
         clerkId: { type: String, required: true },
         text: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
-      }
-    ]
+      },
+    ],
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Task", taskSchema);
+export default mongoose.model('Task', taskSchema);

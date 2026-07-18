@@ -1,13 +1,15 @@
-import { connectDB } from "../lib/db.js";
-import Session from "../models/Session.js";
-import mongoose from "mongoose";
+import { connectDB } from '../lib/db.js';
+import Session from '../models/Session.js';
+import mongoose from 'mongoose';
 
 const run = async () => {
   await connectDB();
 
   // Find all completed meetings
-  const sessions = await Session.find({ status: "completed" });
-  console.log(`Found ${sessions.length} completed session(s) in MongoDB. Calculating and updating durations...`);
+  const sessions = await Session.find({ status: 'completed' });
+  console.log(
+    `Found ${sessions.length} completed session(s) in MongoDB. Calculating and updating durations...`
+  );
 
   let updatedCount = 0;
 
@@ -33,7 +35,9 @@ const run = async () => {
     if (changed) {
       await session.save();
       updatedCount++;
-      console.log(`✅ Updated session ${session._id} (${session.topic}) -> Duration: ${session.duration}s, EndTime: ${session.endTime}`);
+      console.log(
+        `✅ Updated session ${session._id} (${session.topic}) -> Duration: ${session.duration}s, EndTime: ${session.endTime}`
+      );
     }
   }
 
@@ -43,6 +47,6 @@ const run = async () => {
 };
 
 run().catch((err) => {
-  console.error("Fatal error running migration:", err);
+  console.error('Fatal error running migration:', err);
   process.exit(1);
 });

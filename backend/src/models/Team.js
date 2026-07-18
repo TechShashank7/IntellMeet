@@ -1,5 +1,4 @@
-import mongoose from "mongoose";
-
+import mongoose from 'mongoose';
 
 const teamSchema = new mongoose.Schema(
   {
@@ -19,7 +18,7 @@ const teamSchema = new mongoose.Schema(
     ],
     description: {
       type: String,
-      default: "",
+      default: '',
     },
     slackWebhookUrl: {
       type: String,
@@ -37,4 +36,4 @@ const teamSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Team", teamSchema);
+export default mongoose.model('Team', teamSchema);

@@ -5,19 +5,19 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { useTeamStore } from '../store/store';
 import { format } from 'date-fns';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  Users, 
-  FileText, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Users,
+  FileText,
   CheckSquare,
   Sparkles,
   Download,
   MessageCircle,
   ArrowRight,
   Star,
-  X
+  X,
 } from 'lucide-react';
 
 export default function AISummary() {
@@ -28,7 +28,7 @@ export default function AISummary() {
   const { user } = useUser();
   const { currentTeamId } = useTeamStore();
   const [syncedItems, setSyncedItems] = useState<Set<string>>(new Set());
-  
+
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [hasViewedInsights, setHasViewedInsights] = useState(false);
   const [hoveredStar, setHoveredStar] = useState<number | null>(null);
@@ -38,10 +38,17 @@ export default function AISummary() {
   const [downloading, setDownloading] = useState(false);
 
   const [postingToSlack, setPostingToSlack] = useState(false);
-  const [slackMessage, setSlackMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [slackMessage, setSlackMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const [syncingToNotion, setSyncingToNotion] = useState(false);
-  const [notionMessage, setNotionMessage] = useState<{ type: 'success' | 'error', text: string, url?: string } | null>(null);
+  const [notionMessage, setNotionMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+    url?: string;
+  } | null>(null);
 
   const dismissLeftBanner = () => setShowLeftBanner(false);
 
@@ -51,7 +58,7 @@ export default function AISummary() {
     try {
       const token = await getToken();
       if (!token) throw new Error('No token');
-      const safeTitle = (meeting.title || "meeting").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      const safeTitle = (meeting.title || 'meeting').replace(/[^a-z0-9]/gi, '_').toLowerCase();
       await api.downloadMeetingSummaryPdf(id, token, safeTitle);
     } catch (err: any) {
       console.error('Failed to download PDF:', err);
@@ -102,8 +109,8 @@ export default function AISummary() {
 
   const { data: meeting, isLoading: loadingMeeting } = useQuery({
     queryKey: ['meeting', id],
-    queryFn: async () => api.getMeeting(id || '', await getToken() || ''),
-    enabled: !!id
+    queryFn: async () => api.getMeeting(id || '', (await getToken()) || ''),
+    enabled: !!id,
   });
 
   useEffect(() => {
@@ -119,70 +126,85 @@ export default function AISummary() {
       setShowLeftBanner(false);
       return;
     }
-    const timer = setTimeout(() => setSecondsRemaining(s => s - 1), 1000);
+    const timer = setTimeout(() => setSecondsRemaining((s) => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [showLeftBanner, secondsRemaining]);
 
   const { data: aiData, isLoading: loadingSummary } = useQuery({
     queryKey: ['aiSummary', id],
-    queryFn: async () => api.getAISummary(id || '', await getToken() || ''),
+    queryFn: async () => api.getAISummary(id || '', (await getToken()) || ''),
     enabled: !!id,
     refetchInterval: (query) => {
       const status = query.state?.data?.status;
-      return (status === 'pending' || status === 'processing') ? 3000 : false;
-    }
+      return status === 'pending' || status === 'processing' ? 3000 : false;
+    },
   });
 
   const { data: tasks } = useQuery({
     queryKey: ['tasks', currentTeamId],
-    queryFn: async () => api.getTasks(currentTeamId || '', await getToken() || ''),
-    enabled: !!currentTeamId
+    queryFn: async () => api.getTasks(currentTeamId || '', (await getToken()) || ''),
+    enabled: !!currentTeamId,
   });
 
   const { mutate: addTask } = useMutation({
-    mutationFn: async (taskData: { title: string; assignee?: string | null; dueDate?: string; sourceActionItem?: string; sourceMeetingId?: string }) => 
-      api.addTask(currentTeamId || '', await getToken() || '', taskData),
+    mutationFn: async (taskData: {
+      title: string;
+      assignee?: string | null;
+      dueDate?: string;
+      sourceActionItem?: string;
+      sourceMeetingId?: string;
+    }) => api.addTask(currentTeamId || '', (await getToken()) || '', taskData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
-    }
+    },
   });
 
   const alreadyRated = meeting?.ratings?.some((r: any) => r.clerkId === user?.id);
 
   const { mutate: rateCall } = useMutation({
     mutationFn: async (payload: { rating?: number; skipped?: boolean }) =>
-      api.rateMeeting(id || '', await getToken() || '', payload),
+      api.rateMeeting(id || '', (await getToken()) || '', payload),
     onSettled: () => {
       setRatingSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ['meeting', id] });
-    }
+    },
   });
 
   const handleSyncToTasks = (item: any) => {
-    if (syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) || !meeting) return;
-    
+    if (syncedItems.has(item.id) || tasks?.some((t) => t.sourceActionItem === item.id) || !meeting)
+      return;
+
     addTask({
       title: item.text,
       assignee: item.assignee?.clerkId || null,
       dueDate: item.dueDate,
       sourceActionItem: item.id,
-      sourceMeetingId: id
+      sourceMeetingId: id,
     });
-    
-    setSyncedItems(prev => new Set(prev).add(item.id));
+
+    setSyncedItems((prev) => new Set(prev).add(item.id));
   };
 
-  const mappedActionItems = aiData?.actionItems?.map((item: any) => {
-    const attendee = meeting?.attendees?.find(a => a.clerkId === item.assignee);
-    return {
-      ...item,
-      id: item._id || item.id,
-      assignee: attendee || { name: 'Unassigned', initials: '?', color: '#9CA3AF', clerkId: null }
-    };
-  }) || [];
+  const mappedActionItems =
+    aiData?.actionItems?.map((item: any) => {
+      const attendee = meeting?.attendees?.find((a) => a.clerkId === item.assignee);
+      return {
+        ...item,
+        id: item._id || item.id,
+        assignee: attendee || {
+          name: 'Unassigned',
+          initials: '?',
+          color: '#9CA3AF',
+          clerkId: null,
+        },
+      };
+    }) || [];
 
   const keyDecisions = aiData?.summary
-    ? aiData.summary.split('\n').map((line: string) => line.replace(/^-?\s*/, '').trim()).filter((line: string) => line.length > 0)
+    ? aiData.summary
+        .split('\n')
+        .map((line: string) => line.replace(/^-?\s*/, '').trim())
+        .filter((line: string) => line.length > 0)
     : [];
 
   const isLoading = loadingMeeting || loadingSummary;
@@ -213,7 +235,12 @@ export default function AISummary() {
                 <svg className="w-9 h-9 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="#E5E7EB" strokeWidth="3" />
                   <circle
-                    cx="18" cy="18" r="15" fill="none" stroke="#4F46E5" strokeWidth="3"
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="#4F46E5"
+                    strokeWidth="3"
                     strokeDasharray={2 * Math.PI * 15}
                     strokeDashoffset={2 * Math.PI * 15 * (1 - secondsRemaining / 30)}
                     strokeLinecap="round"
@@ -223,7 +250,9 @@ export default function AISummary() {
                   {secondsRemaining}
                 </span>
               </div>
-              <h2 className="text-[18px] font-semibold text-[#111827] mb-1">You left the meeting</h2>
+              <h2 className="text-[18px] font-semibold text-[#111827] mb-1">
+                You left the meeting
+              </h2>
               <p className="text-[13px] text-[#6B7280] mb-4">Want to go back?</p>
               <button
                 onClick={() => navigate(`/meeting/${id}`)}
@@ -235,8 +264,11 @@ export default function AISummary() {
           )}
 
           <div className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative w-full text-center">
-            <button 
-              onClick={() => { dismissLeftBanner(); rateCall({ skipped: true }); }}
+            <button
+              onClick={() => {
+                dismissLeftBanner();
+                rateCall({ skipped: true });
+              }}
               className="absolute top-4 right-4 text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
             >
               <X size={20} />
@@ -249,16 +281,21 @@ export default function AISummary() {
                   key={star}
                   onMouseEnter={() => setHoveredStar(star)}
                   onMouseLeave={() => setHoveredStar(null)}
-                  onClick={() => { dismissLeftBanner(); rateCall({ rating: star }); }}
+                  onClick={() => {
+                    dismissLeftBanner();
+                    rateCall({ rating: star });
+                  }}
                   className={`p-1 transition-colors ${
-                    (hoveredStar !== null ? star <= hoveredStar : false) 
-                      ? 'text-[#4F46E5]' 
+                    (hoveredStar !== null ? star <= hoveredStar : false)
+                      ? 'text-[#4F46E5]'
                       : 'text-[#9CA3AF]'
                   }`}
                 >
-                  <Star 
-                    size={36} 
-                    className={(hoveredStar !== null ? star <= hoveredStar : false) ? 'fill-[#4F46E5]' : ''} 
+                  <Star
+                    size={36}
+                    className={
+                      (hoveredStar !== null ? star <= hoveredStar : false) ? 'fill-[#4F46E5]' : ''
+                    }
                   />
                 </button>
               ))}
@@ -272,13 +309,13 @@ export default function AISummary() {
   if (ratingSubmitted && !hasViewedInsights) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans relative">
-        <button 
+        <button
           onClick={() => navigate('/dashboard')}
           className="absolute top-8 left-8 p-3 text-[#6B7280] hover:text-[#111827] hover:bg-white rounded-full transition-colors flex items-center gap-2 shadow-sm border border-transparent hover:border-[#E5E7EB]"
         >
           <ArrowLeft size={24} />
         </button>
-        <button 
+        <button
           onClick={() => setHasViewedInsights(true)}
           className="px-6 py-3 bg-[#4F46E5] text-white rounded-md font-medium shadow-sm hover:bg-[#4338CA] transition-colors"
         >
@@ -294,7 +331,7 @@ export default function AISummary() {
       <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-10 px-8 py-4">
         <div className="max-w-none w-full px-2 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => navigate('/dashboard')}
               className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-full transition-colors"
             >
@@ -302,27 +339,33 @@ export default function AISummary() {
             </button>
             <div>
               <div className="flex items-center flex-wrap gap-3">
-                <h1 className="text-[20px] font-bold text-[#111827] flex-1 min-w-0">{meeting.title}</h1>
+                <h1 className="text-[20px] font-bold text-[#111827] flex-1 min-w-0">
+                  {meeting.title}
+                </h1>
                 <span className="bg-[#EEF2FF] text-[#4F46E5] text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-[#4F46E5]/20 flex-shrink-0">
                   <Sparkles size={12} /> AI GENERATED
                 </span>
               </div>
               <div className="flex items-center flex-wrap gap-4 mt-1 text-[13px] text-[#6B7280]">
-                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Calendar size={14} /> {meeting.date}</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Clock size={14} /> {meeting.duration}</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"><Users size={14} /> {meeting.attendees?.length || 0} Attendees</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0">
+                  <Calendar size={14} /> {meeting.date}
+                </span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0">
+                  <Clock size={14} /> {meeting.duration}
+                </span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0">
+                  <Users size={14} /> {meeting.attendees?.length || 0} Attendees
+                </span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-          </div>
+          <div className="flex items-center gap-3"></div>
         </div>
       </header>
 
       <div className="max-w-[1400px] mx-auto w-full py-8 px-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
-          
           {/* Executive Summary */}
           <section className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
             <h2 className="text-[18px] font-semibold text-[#111827] mb-4 flex items-center gap-2">
@@ -333,17 +376,16 @@ export default function AISummary() {
               {meeting?.status === 'active' ? (
                 <div className="flex items-center gap-3 text-[#6B7280]">
                   <div className="w-4 h-4 rounded-full border-2 border-[#F59E0B] border-t-transparent animate-spin"></div>
-                  This meeting is still in progress. The summary will be generated after the meeting ends.
+                  This meeting is still in progress. The summary will be generated after the meeting
+                  ends.
                 </div>
-              ) : (aiData?.status === 'pending' || aiData?.status === 'processing') ? (
+              ) : aiData?.status === 'pending' || aiData?.status === 'processing' ? (
                 <div className="flex items-center gap-3 text-[#6B7280]">
                   <div className="w-4 h-4 rounded-full border-2 border-[#4F46E5] border-t-transparent animate-spin"></div>
                   Generating summary — this usually takes a minute or two...
                 </div>
               ) : keyDecisions.length > 0 ? (
-                keyDecisions.map((paragraph: string, idx: number) => (
-                  <p key={idx}>{paragraph}</p>
-                ))
+                keyDecisions.map((paragraph: string, idx: number) => <p key={idx}>{paragraph}</p>)
               ) : (
                 <p>No summary available.</p>
               )}
@@ -358,69 +400,83 @@ export default function AISummary() {
             </h2>
             <div className="space-y-3">
               {meeting?.status === 'active' ? (
-                <p className="text-[13px] text-[#6B7280] italic">Action items will be extracted after the meeting ends.</p>
-              ) : mappedActionItems.length ? mappedActionItems.map((item: any) => {
-                const assigneeDateNode = (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      {item.assignee.profileImage ? (
-                        <img 
-                          src={item.assignee.profileImage} 
-                          alt={item.assignee.name}
-                          className="w-5 h-5 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div 
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                          style={{ background: item.assignee.color }}
-                        >
-                          {item.assignee.initials}
-                        </div>
-                      )}
-                      {item.assignee.name}
-                    </div>
-                    <span className="flex items-center gap-1">
-                      <Calendar size={12} /> {item.dueDate ? format(new Date(item.dueDate), 'MMM d') : 'No due date'}
-                    </span>
-                  </>
-                );
-
-                const actionButtonNode = (
-                  <button 
-                    onClick={() => handleSyncToTasks(item)}
-                    disabled={syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id)}
-                    className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors flex-shrink-0 ${syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) ? 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed' : 'bg-[#EEF2FF] text-[#4F46E5] hover:bg-[#E0E7FF]'}`}
-                  >
-                    {syncedItems.has(item.id) || tasks?.some(t => t.sourceActionItem === item.id) ? 'Synced' : 'Add to Tasks'}
-                  </button>
-                );
-
-                return (
-                  <div key={item.id} className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:border-[#D1D5DB] transition-colors">
-                    <div className="flex items-start gap-4 flex-1 min-w-0">
-                      <div className="mt-1 flex-shrink-0">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
-                          defaultChecked={item.done}
-                        />
+                <p className="text-[13px] text-[#6B7280] italic">
+                  Action items will be extracted after the meeting ends.
+                </p>
+              ) : mappedActionItems.length ? (
+                mappedActionItems.map((item: any) => {
+                  const assigneeDateNode = (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        {item.assignee.profileImage ? (
+                          <img
+                            src={item.assignee.profileImage}
+                            alt={item.assignee.name}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
+                            style={{ background: item.assignee.color }}
+                          >
+                            {item.assignee.initials}
+                          </div>
+                        )}
+                        {item.assignee.name}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
-                        <div className="hidden md:flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} />{' '}
+                        {item.dueDate ? format(new Date(item.dueDate), 'MMM d') : 'No due date'}
+                      </span>
+                    </>
+                  );
+
+                  const actionButtonNode = (
+                    <button
+                      onClick={() => handleSyncToTasks(item)}
+                      disabled={
+                        syncedItems.has(item.id) ||
+                        tasks?.some((t) => t.sourceActionItem === item.id)
+                      }
+                      className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors flex-shrink-0 ${syncedItems.has(item.id) || tasks?.some((t) => t.sourceActionItem === item.id) ? 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed' : 'bg-[#EEF2FF] text-[#4F46E5] hover:bg-[#E0E7FF]'}`}
+                    >
+                      {syncedItems.has(item.id) ||
+                      tasks?.some((t) => t.sourceActionItem === item.id)
+                        ? 'Synced'
+                        : 'Add to Tasks'}
+                    </button>
+                  );
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:border-[#D1D5DB] transition-colors"
+                    >
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                        <div className="mt-1 flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-[#4F46E5] border-[#D1D5DB] rounded focus:ring-[#4F46E5]"
+                            defaultChecked={item.done}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] text-[#111827] font-medium">{item.text}</p>
+                          <div className="hidden md:flex items-center gap-3 mt-2 text-[12px] text-[#6B7280]">
+                            {assigneeDateNode}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex md:contents flex-wrap items-center justify-between gap-2 md:gap-0 pl-8 md:pl-0">
+                        <div className="flex md:hidden items-center gap-3 text-[12px] text-[#6B7280]">
                           {assigneeDateNode}
                         </div>
+                        {actionButtonNode}
                       </div>
                     </div>
-                    <div className="flex md:contents flex-wrap items-center justify-between gap-2 md:gap-0 pl-8 md:pl-0">
-                      <div className="flex md:hidden items-center gap-3 text-[12px] text-[#6B7280]">
-                        {assigneeDateNode}
-                      </div>
-                      {actionButtonNode}
-                    </div>
-                  </div>
-                );
-              }) : (
+                  );
+                })
+              ) : (
                 <div className="text-[14px] text-[#6B7280] italic">No action items extracted.</div>
               )}
             </div>
@@ -430,14 +486,16 @@ export default function AISummary() {
           <section className="bg-white p-8 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
             <h2 className="text-[18px] font-semibold text-[#111827] mb-4">Key Decisions</h2>
             <ul className="space-y-4">
-              {keyDecisions.length > 0 ? keyDecisions.map((decision: string, idx: number) => (
-                <li key={idx} className="flex gap-3">
-                  <span className="w-6 h-6 rounded-full bg-[#F3F4F6] text-[#6B7280] text-[12px] font-bold flex items-center justify-center flex-shrink-0">
-                    {idx + 1}
-                  </span>
-                  <span className="text-[14px] text-[#374151] pt-0.5">{decision}</span>
-                </li>
-              )) : (
+              {keyDecisions.length > 0 ? (
+                keyDecisions.map((decision: string, idx: number) => (
+                  <li key={idx} className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#F3F4F6] text-[#6B7280] text-[12px] font-bold flex items-center justify-center flex-shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-[14px] text-[#374151] pt-0.5">{decision}</span>
+                  </li>
+                ))
+              ) : (
                 <li className="text-[14px] text-[#6B7280] italic">No key points extracted yet.</li>
               )}
             </ul>
@@ -449,7 +507,7 @@ export default function AISummary() {
           <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
             <h3 className="text-[14px] font-semibold text-[#111827] mb-3">Export & Sync</h3>
             <div className="space-y-2">
-              <button 
+              <button
                 onClick={handlePostToSlack}
                 disabled={postingToSlack}
                 className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -459,7 +517,11 @@ export default function AISummary() {
                     <MessageCircle size={16} />
                   </div>
                   <span className="text-[14px] font-medium text-[#374151]">
-                    {postingToSlack ? 'Posting...' : slackMessage?.type === 'success' ? slackMessage.text : 'Post to Slack'}
+                    {postingToSlack
+                      ? 'Posting...'
+                      : slackMessage?.type === 'success'
+                        ? slackMessage.text
+                        : 'Post to Slack'}
                   </span>
                 </div>
                 {(!slackMessage || slackMessage.type === 'success') && (
@@ -469,7 +531,7 @@ export default function AISummary() {
               {slackMessage?.type === 'error' && (
                 <div className="text-xs text-red-500 mt-1 pl-1">{slackMessage.text}</div>
               )}
-              <button 
+              <button
                 onClick={handleSyncToNotion}
                 disabled={syncingToNotion}
                 className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -479,7 +541,11 @@ export default function AISummary() {
                     <span className="font-serif font-bold text-[14px]">N</span>
                   </div>
                   <span className="text-[14px] font-medium text-[#374151]">
-                    {syncingToNotion ? 'Syncing...' : notionMessage?.type === 'success' ? notionMessage.text : 'Sync to Notion'}
+                    {syncingToNotion
+                      ? 'Syncing...'
+                      : notionMessage?.type === 'success'
+                        ? notionMessage.text
+                        : 'Sync to Notion'}
                   </span>
                 </div>
                 {(!notionMessage || notionMessage.type === 'success') && (
@@ -490,11 +556,16 @@ export default function AISummary() {
                 <div className="text-xs text-red-500 mt-1 pl-1">{notionMessage.text}</div>
               )}
               {notionMessage?.url && (
-                <a href={notionMessage.url} target="_blank" rel="noreferrer" className="block text-xs text-right text-[#4F46E5] hover:underline mt-1 mr-2">
+                <a
+                  href={notionMessage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-xs text-right text-[#4F46E5] hover:underline mt-1 mr-2"
+                >
                   View Page in Notion
                 </a>
               )}
-              <button 
+              <button
                 onClick={handleDownloadPdf}
                 disabled={downloading}
                 className="w-full flex items-center justify-between p-3 border border-[#E5E7EB] hover:bg-[#F9FAFB] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -512,28 +583,28 @@ export default function AISummary() {
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-[#E5E7EB] shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-             <h3 className="text-[14px] font-semibold text-[#111827] mb-3">Attendees</h3>
-             <div className="space-y-3">
-               {meeting.attendees?.map((attendee: any, idx: number) => (
-                 <div key={idx} className="flex items-center gap-3">
-                   {attendee.profileImage ? (
-                     <img 
-                       src={attendee.profileImage} 
-                       alt={attendee.name}
-                       className="w-8 h-8 rounded-full object-cover"
-                     />
-                   ) : (
-                     <div 
-                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
-                       style={{ background: attendee.color }}
-                     >
-                       {attendee.initials}
-                     </div>
-                   )}
-                   <span className="text-[14px] text-[#374151]">{attendee.name}</span>
-                 </div>
-               ))}
-             </div>
+            <h3 className="text-[14px] font-semibold text-[#111827] mb-3">Attendees</h3>
+            <div className="space-y-3">
+              {meeting.attendees?.map((attendee: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-3">
+                  {attendee.profileImage ? (
+                    <img
+                      src={attendee.profileImage}
+                      alt={attendee.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
+                      style={{ background: attendee.color }}
+                    >
+                      {attendee.initials}
+                    </div>
+                  )}
+                  <span className="text-[14px] text-[#374151]">{attendee.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

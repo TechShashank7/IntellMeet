@@ -1,6 +1,6 @@
-import { requireAuth, clerkClient } from "@clerk/express";
-import User from "../models/User.js";
-import { upsertStreamUser } from "../lib/stream.js";
+import { requireAuth, clerkClient } from '@clerk/express';
+import User from '../models/User.js';
+import { upsertStreamUser } from '../lib/stream.js';
 
 /**
  * protect: verifies the Clerk session token on the request.
@@ -8,8 +8,8 @@ import { upsertStreamUser } from "../lib/stream.js";
  * team.controller.js / task.controller.js / ai.controller.js expect.
  */
 export const protect = (req, res, next) => {
-  if (req.headers["x-test-bypass"]) {
-    req.auth = { userId: req.headers["x-test-bypass"] };
+  if (req.headers['x-test-bypass']) {
+    req.auth = { userId: req.headers['x-test-bypass'] };
     return next();
   }
   return requireAuth()(req, res, next);
@@ -29,7 +29,7 @@ export const attachUser = async (req, res, next) => {
     const clerkId = req.auth.userId;
 
     if (!clerkId) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     let user = await User.findOne({ clerkId });
@@ -39,9 +39,9 @@ export const attachUser = async (req, res, next) => {
 
       user = await User.create({
         clerkId,
-        email: clerkUser.emailAddresses[0]?.emailAddress || "unknown@example.com",
-        name: clerkUser.firstName || "User",
-        profileImage: clerkUser.imageUrl || "",
+        email: clerkUser.emailAddresses[0]?.emailAddress || 'unknown@example.com',
+        name: clerkUser.firstName || 'User',
+        profileImage: clerkUser.imageUrl || '',
       });
 
       try {
@@ -51,14 +51,14 @@ export const attachUser = async (req, res, next) => {
           image: user.profileImage,
         });
       } catch (streamErr) {
-        console.warn("Failed to sync new user to Stream in attachUser:", streamErr);
+        console.warn('Failed to sync new user to Stream in attachUser:', streamErr);
       }
     }
 
     req.user = user;
     next();
   } catch (error) {
-    console.error("Error in attachUser middleware:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error('Error in attachUser middleware:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };

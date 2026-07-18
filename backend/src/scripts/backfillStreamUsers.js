@@ -2,10 +2,10 @@
 // One-off: syncs every existing Mongo User to Stream (chat + video share the same user objects).
 // Run once from the backend folder: node src/scripts/backfillStreamUsers.js
 
-import { connectDB } from "../lib/db.js";
-import User from "../models/User.js";
-import { upsertStreamUser } from "../lib/stream.js";
-import mongoose from "mongoose";
+import { connectDB } from '../lib/db.js';
+import User from '../models/User.js';
+import { upsertStreamUser } from '../lib/stream.js';
+import mongoose from 'mongoose';
 
 const run = async () => {
   await connectDB();
@@ -37,6 +37,6 @@ const run = async () => {
 };
 
 run().catch((err) => {
-  console.error("Fatal error running backfill:", err);
+  console.error('Fatal error running backfill:', err);
   process.exit(1);
 });

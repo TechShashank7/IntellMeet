@@ -16,15 +16,15 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       const token = await getToken();
-      if (!token) throw new Error("Not authenticated");
+      if (!token) throw new Error('Not authenticated');
       const newTeam = await api.createTeam(token, name.trim());
-      
+
       setTeams([...teams, newTeam]);
       setCurrentTeamId(newTeam._id);
       navigate('/dashboard');
@@ -41,15 +41,24 @@ export default function Onboarding() {
         <div className="w-12 h-12 bg-[#EEF2FF] rounded-full flex items-center justify-center text-[#4F46E5] mb-6">
           <Users size={24} />
         </div>
-        <h1 className="text-[24px] font-bold text-[#111827] tracking-tight mb-2">Create your team</h1>
-        <p className="text-[#6B7280] text-[14px] mb-8">Set up a space for your team to collaborate on meetings and action items.</p>
-        
+        <h1 className="text-[24px] font-bold text-[#111827] tracking-tight mb-2">
+          Create your team
+        </h1>
+        <p className="text-[#6B7280] text-[14px] mb-8">
+          Set up a space for your team to collaborate on meetings and action items.
+        </p>
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="teamName" className="block text-[13px] font-medium text-[#374151] mb-1.5">Team Name</label>
-            <input 
+            <label
+              htmlFor="teamName"
+              className="block text-[13px] font-medium text-[#374151] mb-1.5"
+            >
+              Team Name
+            </label>
+            <input
               id="teamName"
-              type="text" 
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Acme Corp or Engineering"
@@ -58,15 +67,15 @@ export default function Onboarding() {
               disabled={loading}
             />
           </div>
-          
+
           {error && (
             <div className="p-3 bg-[#FEF2F2] border border-[#F87171]/20 rounded-md text-[13px] text-[#EF4444]">
               {error}
             </div>
           )}
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             disabled={loading || !name.trim()}
             className="w-full bg-[#4F46E5] text-white font-medium rounded-lg px-4 py-2.5 text-[14px] hover:bg-[#4338CA] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
           >

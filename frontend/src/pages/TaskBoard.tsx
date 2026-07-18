@@ -4,18 +4,18 @@ import { useAuth } from '@clerk/clerk-react';
 import { api } from '../lib/api';
 import { useTeamStore } from '../store/store';
 import type { Task } from '../store/store';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  MoreHorizontal, 
+import {
+  Search,
+  Filter,
+  Plus,
+  MoreHorizontal,
   Calendar,
   AlertCircle,
   ChevronDown,
   Check,
   MessageCircle,
   X,
-  Send
+  Send,
 } from 'lucide-react';
 import { getInitials, getAvatarColor } from '../lib/utils';
 
@@ -23,17 +23,20 @@ const COLUMNS = [
   { id: 'backlog', title: 'Backlog', color: '#6B7280' },
   { id: 'in-progress', title: 'In Progress', color: '#3B82F6' },
   { id: 'in-review', title: 'In Review', color: '#F59E0B' },
-  { id: 'done', title: 'Done', color: '#10B981' }
+  { id: 'done', title: 'Done', color: '#10B981' },
 ];
 
 export default function TaskBoard() {
   const queryClient = useQueryClient();
   const { currentTeamId, teams, setCurrentTeamId } = useTeamStore();
   const { getToken } = useAuth();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
-  const currentTeam = useMemo(() => teams.find(t => t._id === currentTeamId), [teams, currentTeamId]);
+  const currentTeam = useMemo(
+    () => teams.find((t) => t._id === currentTeamId),
+    [teams, currentTeamId]
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
@@ -64,28 +67,26 @@ export default function TaskBoard() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', currentTeamId],
-    queryFn: async () => api.getTasks(currentTeamId || '', await getToken() || ''),
+    queryFn: async () => api.getTasks(currentTeamId || '', (await getToken()) || ''),
     enabled: !!currentTeamId,
   });
 
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['teamMembers', currentTeamId],
-    queryFn: async () => api.getTeamMembers(currentTeamId || '', await getToken() || ''),
+    queryFn: async () => api.getTeamMembers(currentTeamId || '', (await getToken()) || ''),
     enabled: !!currentTeamId,
   });
 
   const { mutate: updateStatus } = useMutation({
-    mutationFn: async ({ id, status }: { id: string, status: Task['status'] }) => 
-      api.updateTaskStatus(id, status, await getToken() || ''),
+    mutationFn: async ({ id, status }: { id: string; status: Task['status'] }) =>
+      api.updateTaskStatus(id, status, (await getToken()) || ''),
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', currentTeamId] });
       const previousTasks = queryClient.getQueryData<Task[]>(['tasks', currentTeamId]);
-      
+
       if (previousTasks) {
-        queryClient.setQueryData<Task[]>(['tasks', currentTeamId], old => 
-          old ? old.map(task => 
-            task.id === id ? { ...task, status } : task
-          ) : []
+        queryClient.setQueryData<Task[]>(['tasks', currentTeamId], (old) =>
+          old ? old.map((task) => (task.id === id ? { ...task, status } : task)) : []
         );
       }
       return { previousTasks };
@@ -97,12 +98,17 @@ export default function TaskBoard() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
-    }
+    },
   });
 
   const { mutate: addTask } = useMutation({
-    mutationFn: async (taskData: { title: string; description?: string; assignee?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => 
-      api.addTask(currentTeamId || '', await getToken() || '', taskData),
+    mutationFn: async (taskData: {
+      title: string;
+      description?: string;
+      assignee?: string;
+      dueDate?: string;
+      priority?: 'low' | 'medium' | 'high';
+    }) => api.addTask(currentTeamId || '', (await getToken()) || '', taskData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
       setIsModalOpen(false);
@@ -111,46 +117,45 @@ export default function TaskBoard() {
       setNewTaskAssignee('');
       setNewTaskDue('');
       setNewTaskPriority('medium');
-    }
+    },
   });
 
   const { mutate: updateTask } = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: any }) => 
-      api.updateTask(id, await getToken() || '', updates),
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) =>
+      api.updateTask(id, (await getToken()) || '', updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
       setSelectedTask(null);
-    }
+    },
   });
 
   const { mutate: deleteTask } = useMutation({
-    mutationFn: async (id: string) => 
-      api.deleteTask(id, await getToken() || ''),
+    mutationFn: async (id: string) => api.deleteTask(id, (await getToken()) || ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
       setSelectedTask(null);
-    }
+    },
   });
 
   const { mutate: addComment } = useMutation({
-    mutationFn: async ({ id, text }: { id: string; text: string }) => 
-      api.addTaskComment(id, text, await getToken() || ''),
+    mutationFn: async ({ id, text }: { id: string; text: string }) =>
+      api.addTaskComment(id, text, (await getToken()) || ''),
     onSuccess: (updatedTask) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', currentTeamId] });
       setSelectedTask(updatedTask);
       setNewCommentText('');
-    }
+    },
   });
 
   const handleAddTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    addTask({ 
-      title: newTaskTitle, 
+    addTask({
+      title: newTaskTitle,
       description: newTaskDescription,
-      assignee: newTaskAssignee || undefined, 
-      dueDate: newTaskDue || undefined, 
-      priority: newTaskPriority 
+      assignee: newTaskAssignee || undefined,
+      dueDate: newTaskDue || undefined,
+      priority: newTaskPriority,
     });
   };
 
@@ -164,8 +169,8 @@ export default function TaskBoard() {
         description: editDescription,
         assignee: editAssignee || null,
         dueDate: editDueDate || null,
-        priority: editPriority
-      }
+        priority: editPriority,
+      },
     });
   };
 
@@ -209,23 +214,24 @@ export default function TaskBoard() {
 
     if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase();
-      result = result.filter(t => 
-        t.title.toLowerCase().includes(lowerQuery) || 
-        t.sourceMeetingTitle?.toLowerCase().includes(lowerQuery)
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(lowerQuery) ||
+          t.sourceMeetingTitle?.toLowerCase().includes(lowerQuery)
       );
     }
 
     if (filterPriority !== 'all') {
-      result = result.filter(t => t.priority === filterPriority);
+      result = result.filter((t) => t.priority === filterPriority);
     }
 
     if (filterAssignee !== 'all') {
       if (filterAssignee === 'unassigned') {
-        result = result.filter(t => !t.assignee || t.assignee.name === 'Unassigned');
+        result = result.filter((t) => !t.assignee || t.assignee.name === 'Unassigned');
       } else {
         const member = teamMembers.find((m: any) => m.clerkId === filterAssignee);
         if (member) {
-          result = result.filter(t => t.assignee.name === member.name);
+          result = result.filter((t) => t.assignee.name === member.name);
         }
       }
     }
@@ -272,35 +278,53 @@ export default function TaskBoard() {
     <div className="flex flex-col h-full bg-[#FAFAFA] font-sans">
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[400px] p-6 mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setIsModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsModalOpen(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[400px] p-6 mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-lg font-bold text-[#111827] mb-4">Add Task</h2>
             <form onSubmit={handleAddTaskSubmit} className="space-y-4">
               <div>
                 <label className="block text-[13px] font-medium text-[#374151] mb-1">Title *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
                   className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Description</label>
-                <textarea 
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                  Description
+                </label>
+                <textarea
                   value={newTaskDescription}
-                  onChange={e => setNewTaskDescription(e.target.value)}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
                   rows={3}
                   className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
                   placeholder="Add a detailed description..."
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee</label>
-                <select 
+                <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                  Assignee
+                </label>
+                <select
                   value={newTaskAssignee}
-                  onChange={e => setNewTaskAssignee(e.target.value)}
+                  onChange={(e) => setNewTaskAssignee(e.target.value)}
                   className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                 >
                   <option value="">Unassigned</option>
@@ -313,19 +337,25 @@ export default function TaskBoard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date</label>
-                  <input 
-                    type="date" 
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
                     value={newTaskDue}
-                    onChange={e => setNewTaskDue(e.target.value)}
+                    onChange={(e) => setNewTaskDue(e.target.value)}
                     className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Priority</label>
-                  <select 
+                  <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                    Priority
+                  </label>
+                  <select
                     value={newTaskPriority}
-                    onChange={e => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
+                    onChange={(e) =>
+                      setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')
+                    }
                     className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
                   >
                     <option value="low">Low</option>
@@ -335,15 +365,15 @@ export default function TaskBoard() {
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
                 >
                   Add Task
@@ -358,7 +388,9 @@ export default function TaskBoard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 md:px-8 py-6 border-b border-[#E5E7EB] bg-white flex-shrink-0">
         <div>
           <h1 className="text-[24px] font-bold text-[#111827]">Action Items</h1>
-          <p className="text-[#6B7280] text-[14px] mt-1">Manage and track follow-ups from your meetings.</p>
+          <p className="text-[#6B7280] text-[14px] mt-1">
+            Manage and track follow-ups from your meetings.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {teams.length > 0 && (
@@ -373,8 +405,13 @@ export default function TaskBoard() {
                 >
                   {getInitials(currentTeam?.name)}
                 </div>
-                <span className="text-[13px] font-[500] text-[#111827] flex-1 text-left truncate">{currentTeam?.name || 'Select a team'}</span>
-                <ChevronDown size={14} className={`text-[#9CA3AF] transition-transform ${isTeamDropdownOpen ? 'rotate-180' : ''}`} />
+                <span className="text-[13px] font-[500] text-[#111827] flex-1 text-left truncate">
+                  {currentTeam?.name || 'Select a team'}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`text-[#9CA3AF] transition-transform ${isTeamDropdownOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isTeamDropdownOpen && (
@@ -394,8 +431,12 @@ export default function TaskBoard() {
                       >
                         {getInitials(team.name)}
                       </div>
-                      <span className="text-[13px] font-[500] text-[#111827] flex-1 truncate">{team.name}</span>
-                      {team._id === currentTeamId && <Check size={14} className="text-[#4F46E5] flex-shrink-0" />}
+                      <span className="text-[13px] font-[500] text-[#111827] flex-1 truncate">
+                        {team.name}
+                      </span>
+                      {team._id === currentTeamId && (
+                        <Check size={14} className="text-[#4F46E5] flex-shrink-0" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -404,29 +445,35 @@ export default function TaskBoard() {
           )}
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-            <input 
-              type="text" 
-              placeholder="Search tasks..." 
+            <input
+              type="text"
+              placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] focus:border-[#4F46E5] shadow-sm w-full sm:w-[240px]"
             />
           </div>
           <div className="relative">
-            <button 
+            <button
               onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
               className={`px-3 py-2 bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2 ${
-                filterPriority !== 'all' || filterAssignee !== 'all' ? 'border-[#4F46E5] text-[#4F46E5]' : ''
+                filterPriority !== 'all' || filterAssignee !== 'all'
+                  ? 'border-[#4F46E5] text-[#4F46E5]'
+                  : ''
               }`}
             >
               <Filter size={16} /> Filter
             </button>
             {isFilterDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white border border-[#E5E7EB] rounded-lg shadow-lg p-4 z-50">
-                <h3 className="text-xs font-semibold text-[#374151] uppercase tracking-wider mb-3">Filters</h3>
+                <h3 className="text-xs font-semibold text-[#374151] uppercase tracking-wider mb-3">
+                  Filters
+                </h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">Priority</label>
+                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">
+                      Priority
+                    </label>
                     <select
                       value={filterPriority}
                       onChange={(e) => setFilterPriority(e.target.value)}
@@ -439,7 +486,9 @@ export default function TaskBoard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">Assignee</label>
+                    <label className="block text-[11px] font-medium text-[#6B7280] mb-1">
+                      Assignee
+                    </label>
                     <select
                       value={filterAssignee}
                       onChange={(e) => setFilterAssignee(e.target.value)}
@@ -477,7 +526,7 @@ export default function TaskBoard() {
               </div>
             )}
           </div>
-          <button 
+          <button
             onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md text-[13px] font-medium transition-colors shadow-sm flex items-center gap-2"
           >
@@ -495,17 +544,20 @@ export default function TaskBoard() {
         <div className="flex-1 overflow-hidden p-4 md:p-8 flex flex-col">
           {/* Mobile Tab Switcher */}
           <div className="md:hidden flex gap-2 overflow-x-auto pb-4 flex-shrink-0 mb-4">
-            {COLUMNS.map(col => {
-              const count = filteredTasks.filter(t => t.status === col.id).length;
+            {COLUMNS.map((col) => {
+              const count = filteredTasks.filter((t) => t.status === col.id).length;
               const isActive = activeColumn === col.id;
               return (
-                <button 
+                <button
                   key={col.id}
                   onClick={() => setActiveColumn(col.id as Task['status'])}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap border transition-colors ${isActive ? 'border-[#4F46E5] bg-[#EEF2FF] text-[#4F46E5]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'}`}
                 >
                   <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
-                  {col.title} <span className="bg-[#E5E7EB] text-[#4B5563] px-1.5 py-0.5 rounded-full text-[10px]">{count}</span>
+                  {col.title}{' '}
+                  <span className="bg-[#E5E7EB] text-[#4B5563] px-1.5 py-0.5 rounded-full text-[10px]">
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -513,12 +565,12 @@ export default function TaskBoard() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
             {COLUMNS.map((col) => {
-              const columnTasks = filteredTasks.filter(t => t.status === col.id);
+              const columnTasks = filteredTasks.filter((t) => t.status === col.id);
               const isMobileActive = activeColumn === col.id;
-              
+
               return (
-                <div 
-                  key={col.id} 
+                <div
+                  key={col.id}
                   className={`flex-col h-full rounded-xl transition-colors border border-transparent min-w-0 ${isMobileActive ? 'flex' : 'hidden md:flex'}`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -526,8 +578,8 @@ export default function TaskBoard() {
                 >
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">
-                      <span 
-                        className="w-2.5 h-2.5 rounded-full" 
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
                         style={{ background: col.color }}
                       />
                       <h2 className="text-[14px] font-semibold text-[#111827]">{col.title}</h2>
@@ -542,7 +594,7 @@ export default function TaskBoard() {
 
                   <div className="flex-1 overflow-y-auto space-y-3 pb-4">
                     {columnTasks.map((task) => (
-                      <div 
+                      <div
                         key={task.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
@@ -564,11 +616,15 @@ export default function TaskBoard() {
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
                             {task.priority && (
-                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                task.priority === 'high' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                task.priority === 'medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                'bg-slate-50 text-slate-600 border border-slate-100'
-                              }`}>
+                              <span
+                                className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                  task.priority === 'high'
+                                    ? 'bg-red-50 text-red-600 border border-red-100'
+                                    : task.priority === 'medium'
+                                      ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                      : 'bg-slate-50 text-slate-600 border border-slate-100'
+                                }`}
+                              >
                                 {task.priority}
                               </span>
                             )}
@@ -577,11 +633,11 @@ export default function TaskBoard() {
                             )}
                           </div>
                         </div>
-                        
+
                         {task.sourceMeetingTitle && (
-                           <div className="text-[12px] text-[#6B7280] mb-3 truncate bg-[#F3F4F6] inline-block px-2 py-0.5 rounded">
-                             From: {task.sourceMeetingTitle}
-                           </div>
+                          <div className="text-[12px] text-[#6B7280] mb-3 truncate bg-[#F3F4F6] inline-block px-2 py-0.5 rounded">
+                            From: {task.sourceMeetingTitle}
+                          </div>
                         )}
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#F3F4F6]">
@@ -591,14 +647,14 @@ export default function TaskBoard() {
                           </div>
                           <div className="flex items-center gap-1.5">
                             {task.assignee.profileImage ? (
-                              <img 
-                                src={task.assignee.profileImage} 
+                              <img
+                                src={task.assignee.profileImage}
                                 alt={task.assignee.name}
                                 title={task.assignee.name}
                                 className="w-6 h-6 rounded-full object-cover shadow-sm"
                               />
                             ) : (
-                              <div 
+                              <div
                                 className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shadow-sm"
                                 style={{ background: task.assignee.color }}
                                 title={task.assignee.name}
@@ -606,14 +662,17 @@ export default function TaskBoard() {
                                 {task.assignee.initials}
                               </div>
                             )}
-                            <span className="text-[11.5px] font-medium text-[#4B5563] max-w-[90px] truncate" title={task.assignee.name}>
+                            <span
+                              className="text-[11.5px] font-medium text-[#4B5563] max-w-[90px] truncate"
+                              title={task.assignee.name}
+                            >
                               {task.assignee.name}
                             </span>
                           </div>
                         </div>
                       </div>
                     ))}
-                    
+
                     {columnTasks.length === 0 && (
                       <div className="h-24 rounded-lg border-2 border-dashed border-[#E5E7EB] flex items-center justify-center text-[#9CA3AF] text-[13px]">
                         Drop tasks here
@@ -629,13 +688,27 @@ export default function TaskBoard() {
 
       {/* Detail Modal */}
       {selectedTask && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedTask(null)}>
-          <div className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[450px] p-6 max-h-[90vh] overflow-y-auto mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setSelectedTask(null)}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSelectedTask(null);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg w-[calc(100vw-2rem)] max-w-[450px] p-6 max-h-[90vh] overflow-y-auto mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             {isCommentsView ? (
               <div className="flex flex-col h-[450px]">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
                   <h2 className="text-lg font-bold text-[#111827]">Comments</h2>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsCommentsView(false)}
                     className="p-1.5 text-[#6B7280] hover:bg-[#F3F4F6] rounded-md transition-colors"
@@ -649,9 +722,13 @@ export default function TaskBoard() {
                     return (
                       <div key={comment._id || comment.createdAt} className="flex gap-3">
                         {member?.profileImage ? (
-                          <img src={member.profileImage} alt={member.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-[#E5E7EB]" />
+                          <img
+                            src={member.profileImage}
+                            alt={member.name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-[#E5E7EB]"
+                          />
                         ) : (
-                          <div 
+                          <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-sm flex-shrink-0"
                             style={{ background: getAvatarColor(comment.clerkId) }}
                           >
@@ -660,12 +737,20 @@ export default function TaskBoard() {
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 mb-0.5">
-                            <span className="text-[13px] font-semibold text-[#111827] truncate">{member?.name || 'Unknown User'}</span>
+                            <span className="text-[13px] font-semibold text-[#111827] truncate">
+                              {member?.name || 'Unknown User'}
+                            </span>
                             <span className="text-[11px] text-[#6B7280] flex-shrink-0">
-                              {new Date(comment.createdAt).toLocaleDateString()} at {new Date(comment.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              {new Date(comment.createdAt).toLocaleDateString()} at{' '}
+                              {new Date(comment.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </span>
                           </div>
-                          <p className="text-[13px] text-[#374151] whitespace-pre-wrap break-words">{comment.text}</p>
+                          <p className="text-[13px] text-[#374151] whitespace-pre-wrap break-words">
+                            {comment.text}
+                          </p>
                         </div>
                       </div>
                     );
@@ -709,170 +794,188 @@ export default function TaskBoard() {
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#F3F4F6]">
                   <h2 className="text-lg font-bold text-[#111827]">Task Details</h2>
                   <div className="relative">
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setIsTaskMenuOpen(!isTaskMenuOpen)}
                       className="p-1.5 text-[#6B7280] hover:bg-[#F3F4F6] rounded-md transition-colors"
                     >
                       <MoreHorizontal size={18} />
                     </button>
-                {isTaskMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-36 bg-white border border-[#E5E7EB] rounded-lg shadow-lg py-1 z-10">
-                    {!isEditingTask && (
+                    {isTaskMenuOpen && (
+                      <div className="absolute right-0 mt-1 w-36 bg-white border border-[#E5E7EB] rounded-lg shadow-lg py-1 z-10">
+                        {!isEditingTask && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingTask(true);
+                              setIsTaskMenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F9FAFB]"
+                          >
+                            Edit Task
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleDeleteTask();
+                            setIsTaskMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-[#EF4444] hover:bg-[#FEF2F2]"
+                        >
+                          Delete Task
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div>
+                    <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                      Title *
+                    </label>
+                    {isEditingTask ? (
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
+                        required
+                      />
+                    ) : (
+                      <div className="text-[14px] text-[#111827]">{editTitle}</div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                      Description
+                    </label>
+                    {isEditingTask ? (
+                      <textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        rows={3}
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
+                        placeholder="Add a detailed description..."
+                      />
+                    ) : (
+                      <div className="text-[13px] text-[#4B5563] whitespace-pre-wrap">
+                        {editDescription || 'No description provided.'}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                      Assignee
+                    </label>
+                    {isEditingTask ? (
+                      <select
+                        value={editAssignee}
+                        onChange={(e) => setEditAssignee(e.target.value)}
+                        className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                      >
+                        <option value="">Unassigned</option>
+                        {teamMembers.map((member: any) => (
+                          <option key={member.clerkId} value={member.clerkId}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-[13px] text-[#111827]">
+                        {editAssignee
+                          ? teamMembers.find((m: any) => m.clerkId === editAssignee)?.name
+                          : 'Unassigned'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                        Due Date
+                      </label>
+                      {isEditingTask ? (
+                        <input
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                          className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                        />
+                      ) : (
+                        <div className="text-[13px] text-[#111827]">
+                          {editDueDate || 'No due date'}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-medium text-[#374151] mb-1">
+                        Priority
+                      </label>
+                      {isEditingTask ? (
+                        <select
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                          className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      ) : (
+                        <div className="text-[13px] text-[#111827] capitalize">{editPriority}</div>
+                      )}
+                    </div>
+                  </div>
+                  {isEditingTask && (
+                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F3F4F6]">
                       <button
                         type="button"
                         onClick={() => {
-                          setIsEditingTask(true);
-                          setIsTaskMenuOpen(false);
+                          setIsEditingTask(false);
+                          setEditTitle(selectedTask.title);
+                          setEditDescription(selectedTask.description || '');
+                          setEditAssignee(selectedTask.assignee?.clerkId || '');
+                          let formattedDate = '';
+                          if (selectedTask.dueDate) {
+                            formattedDate = new Date(selectedTask.dueDate)
+                              .toISOString()
+                              .split('T')[0];
+                          }
+                          setEditDueDate(formattedDate);
+                          setEditPriority(selectedTask.priority || 'medium');
                         }}
-                        className="w-full text-left px-3 py-1.5 text-[13px] text-[#374151] hover:bg-[#F9FAFB]"
+                        className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
                       >
-                        Edit Task
+                        Cancel
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleDeleteTask();
-                        setIsTaskMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-[13px] text-[#EF4444] hover:bg-[#FEF2F2]"
-                    >
-                      Delete Task
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <form onSubmit={handleSaveEdit} className="space-y-4">
-              <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Title *</label>
-                {isEditingTask ? (
-                  <input 
-                    type="text" 
-                    value={editTitle}
-                    onChange={e => setEditTitle(e.target.value)}
-                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none"
-                    required
-                  />
-                ) : (
-                  <div className="text-[14px] text-[#111827]">{editTitle}</div>
-                )}
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Description</label>
-                {isEditingTask ? (
-                  <textarea 
-                    value={editDescription}
-                    onChange={e => setEditDescription(e.target.value)}
-                    rows={3}
-                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none resize-none bg-white"
-                    placeholder="Add a detailed description..."
-                  />
-                ) : (
-                  <div className="text-[13px] text-[#4B5563] whitespace-pre-wrap">{editDescription || 'No description provided.'}</div>
-                )}
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-[#374151] mb-1">Assignee</label>
-                {isEditingTask ? (
-                  <select 
-                    value={editAssignee}
-                    onChange={e => setEditAssignee(e.target.value)}
-                    className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((member: any) => (
-                      <option key={member.clerkId} value={member.clerkId}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="text-[13px] text-[#111827]">
-                    {editAssignee ? teamMembers.find((m: any) => m.clerkId === editAssignee)?.name : 'Unassigned'}
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Due Date</label>
-                  {isEditingTask ? (
-                    <input 
-                      type="date" 
-                      value={editDueDate}
-                      onChange={e => setEditDueDate(e.target.value)}
-                      className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                    />
-                  ) : (
-                    <div className="text-[13px] text-[#111827]">{editDueDate || 'No due date'}</div>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
                   )}
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-[#374151] mb-1">Priority</label>
-                  {isEditingTask ? (
-                    <select 
-                      value={editPriority}
-                      onChange={e => setEditPriority(e.target.value)}
-                      className="w-full border border-[#E5E7EB] rounded-md px-3 py-2 text-[13px] focus:ring-1 focus:ring-[#4F46E5] focus:outline-none bg-white"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  ) : (
-                    <div className="text-[13px] text-[#111827] capitalize">{editPriority}</div>
+                  {!isEditingTask && (
+                    <div className="flex justify-end mt-6 pt-4 border-t border-[#F3F4F6]">
+                      <button
+                        type="button"
+                        onClick={() => setIsCommentsView(true)}
+                        className="relative p-2 text-[#6B7280] hover:bg-[#F3F4F6] rounded-full transition-colors"
+                        title="Comments"
+                      >
+                        <MessageCircle size={22} />
+                        {selectedTask.comments && selectedTask.comments.length > 0 && (
+                          <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 bg-[#EF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white leading-none">
+                            {selectedTask.comments.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   )}
-                </div>
-              </div>
-              {isEditingTask && (
-                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F3F4F6]">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setIsEditingTask(false);
-                      setEditTitle(selectedTask.title);
-                      setEditDescription(selectedTask.description || '');
-                      setEditAssignee(selectedTask.assignee?.clerkId || '');
-                      let formattedDate = '';
-                      if (selectedTask.dueDate) {
-                        formattedDate = new Date(selectedTask.dueDate).toISOString().split('T')[0];
-                      }
-                      setEditDueDate(formattedDate);
-                      setEditPriority(selectedTask.priority || 'medium');
-                    }}
-                    className="px-4 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-[#F3F4F6] rounded-md"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="px-4 py-2 text-[13px] font-medium bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              )}
-              {!isEditingTask && (
-                <div className="flex justify-end mt-6 pt-4 border-t border-[#F3F4F6]">
-                  <button 
-                    type="button" 
-                    onClick={() => setIsCommentsView(true)}
-                    className="relative p-2 text-[#6B7280] hover:bg-[#F3F4F6] rounded-full transition-colors"
-                    title="Comments"
-                  >
-                    <MessageCircle size={22} />
-                    {selectedTask.comments && selectedTask.comments.length > 0 && (
-                      <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 bg-[#EF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white leading-none">
-                        {selectedTask.comments.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
-            </form>
-            </>
-          )}
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}

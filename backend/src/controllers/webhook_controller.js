@@ -61,7 +61,7 @@ export const handleStreamVideoWebhook = async (req, res) => {
           try {
             const parsed = JSON.parse(line);
             return `${parsed.speaker_id || 'Unknown'}: ${parsed.text}`;
-          } catch (e) {
+          } catch {
             return null;
           }
         })
@@ -82,7 +82,7 @@ export const handleStreamVideoWebhook = async (req, res) => {
               };
             }
             return null;
-          } catch (e) {
+          } catch {
             return null;
           }
         })

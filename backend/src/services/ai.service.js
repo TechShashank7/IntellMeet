@@ -56,10 +56,10 @@ ${transcript}
       try {
         parsed = JSON.parse(jsonMatch[0]);
       } catch (innerErr) {
-        throw new Error('Failed to parse extracted JSON from Gemini response');
+        throw new Error('Failed to parse extracted JSON from Gemini response', { cause: innerErr });
       }
     } else {
-      throw new Error('Could not find valid JSON object in Gemini response');
+      throw new Error('Could not find valid JSON object in Gemini response', { cause: err });
     }
   }
 

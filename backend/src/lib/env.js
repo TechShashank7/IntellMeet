@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-import { getMentionedUsersInText } from 'stream-chat';
 
 dotenv.config({ quiet: true });
 export const ENV = {

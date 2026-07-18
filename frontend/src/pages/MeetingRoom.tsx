@@ -1032,6 +1032,7 @@ function MeetingRoomContent({
               }}
               className="text-[#94A3B8] hover:text-white transition-colors flex-shrink-0"
               title="Meeting info"
+              aria-label="Meeting info"
             >
               <Info size={16} />
             </button>
@@ -1189,6 +1190,7 @@ function MeetingRoomContent({
                   : 'bg-[#1E293B] text-[#94A3B8]'
               } ${isHost ? 'hover:bg-[#334155] cursor-pointer' : 'cursor-default'}`}
               title={isHost ? 'Live transcription' : undefined}
+              aria-label="Toggle live transcription"
             >
               <FileText size={16} />
             </button>
@@ -1209,6 +1211,7 @@ function MeetingRoomContent({
                     <button
                       onClick={handleToggleCaptions}
                       className={`w-10 h-[22px] rounded-full relative transition-colors ${captionsEnabled ? 'bg-[#4F46E5]' : 'bg-[#475569]'}`}
+                      aria-label="Enable transcript"
                     >
                       <span
                         className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${captionsEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`}
@@ -1281,6 +1284,7 @@ function MeetingRoomContent({
                   <button
                     onClick={() => setIsSidebarOpen(false)}
                     className="md:hidden flex items-center justify-center px-4 border-l border-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B] transition-colors"
+                    aria-label="Close sidebar"
                   >
                     <X size={18} />
                   </button>
@@ -1410,6 +1414,7 @@ function MeetingRoomContent({
                       <button
                         type="submit"
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#4F46E5] hover:bg-[#1E293B] rounded-full transition-colors"
+                        aria-label="Send message"
                       >
                         <Send size={14} />
                       </button>
@@ -1438,6 +1443,7 @@ function MeetingRoomContent({
                 className={`w-11 md:w-12 h-11 md:h-12 rounded-l-full flex items-center justify-center transition-colors ${
                   isMicMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
                 }`}
+                aria-label={isMicMuted ? 'Unmute microphone' : 'Mute microphone'}
               >
                 {isMicMuted ? (
                   <MicOff size={20} className="text-white" />
@@ -1456,6 +1462,7 @@ function MeetingRoomContent({
                 className={`w-6 md:w-7 h-11 md:h-12 rounded-r-full flex items-center justify-center transition-colors ${
                   isMicMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
                 } text-white`}
+                aria-label="Select microphone device"
               >
                 <ChevronUp size={16} />
               </button>
@@ -1499,6 +1506,7 @@ function MeetingRoomContent({
                 className={`w-11 md:w-12 h-11 md:h-12 rounded-l-full flex items-center justify-center transition-colors ${
                   isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
                 }`}
+                aria-label={isCamMuted ? 'Turn on camera' : 'Turn off camera'}
               >
                 {isCamMuted ? (
                   <VideoOff size={20} className="text-white" />
@@ -1517,6 +1525,7 @@ function MeetingRoomContent({
                 className={`w-6 md:w-7 h-11 md:h-12 rounded-r-full flex items-center justify-center transition-colors ${
                   isCamMuted ? 'hover:bg-[#DC2626]' : 'hover:bg-[#475569]'
                 } text-white`}
+                aria-label="Select camera device"
               >
                 <ChevronUp size={16} />
               </button>
@@ -1559,6 +1568,7 @@ function MeetingRoomContent({
                     ? 'bg-[#4F46E5] hover:bg-[#4338CA]'
                     : 'bg-[#334155] hover:bg-[#475569]'
                 }`}
+                aria-label={!isScreenShared ? 'Share screen' : 'Stop sharing screen'}
               >
                 <MonitorUp size={20} className="text-white" />
               </button>
@@ -1578,6 +1588,7 @@ function MeetingRoomContent({
                   onClick={() => setShowSettingsPopup((prev) => !prev)}
                   className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors"
                   title="Meeting settings"
+                  aria-label="Meeting settings"
                 >
                   <Settings size={18} />
                 </button>
@@ -1616,6 +1627,7 @@ function MeetingRoomContent({
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="relative md:absolute md:right-6 md:top-1/2 md:-translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 rounded-full bg-[#1E293B] border border-[#334155] text-white shadow-md flex items-center justify-center hover:bg-[#2D3748] transition-colors flex-shrink-0"
               title={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+              aria-label={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
             >
               {isSidebarOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
@@ -1629,6 +1641,7 @@ function MeetingRoomContent({
           <button
             onClick={handleEndCallButtonClick}
             className="w-14 md:w-16 h-11 md:h-12 rounded-full bg-[#EF4444] hover:bg-[#DC2626] flex items-center justify-center transition-colors"
+            aria-label="End call"
           >
             <PhoneOff size={20} className="text-white" />
           </button>
@@ -1665,6 +1678,7 @@ function MeetingRoomContent({
                 if (meetingReadyTimeoutRef.current) clearTimeout(meetingReadyTimeoutRef.current);
               }}
               className="text-[#6B7280] hover:text-[#111827] transition-colors"
+              aria-label="Close meeting ready card"
             >
               <X size={20} />
             </button>
@@ -1685,6 +1699,7 @@ function MeetingRoomContent({
                 setTimeout(() => setLinkCopied(false), 2000);
               }}
               className="text-[#6B7280] hover:text-[#111827] transition-colors flex-shrink-0"
+              aria-label="Copy meeting link"
             >
               {linkCopied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
             </button>

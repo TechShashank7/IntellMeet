@@ -66,7 +66,7 @@ const summarizeMeeting = asyncHandler(async (req, res) => {
     session.aiProcessingStatus = 'failed';
     await session.save();
     res.status(502);
-    throw new Error(`AI summarization failed: ${err.message}`);
+    throw new Error(`AI summarization failed: ${err.message}`, { cause: err });
   }
 });
 
@@ -139,7 +139,7 @@ const getSessionSummary = asyncHandler(async (req, res) => {
                       try {
                         const parsed = JSON.parse(line);
                         return `${parsed.speaker_id || 'Unknown'}: ${parsed.text}`;
-                      } catch (e) {
+                      } catch {
                         return null;
                       }
                     })
@@ -162,7 +162,7 @@ const getSessionSummary = asyncHandler(async (req, res) => {
                           };
                         }
                         return null;
-                      } catch (e) {
+                      } catch {
                         return null;
                       }
                     })

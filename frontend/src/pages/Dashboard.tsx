@@ -854,7 +854,15 @@ export default function Dashboard() {
         )}
 
         {isCreateTeamModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setIsCreateTeamModalOpen(false);
+            }}
+          >
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
                 <h3 className="text-[16px] font-[600] text-[#111827]">Create New Team</h3>
@@ -900,7 +908,15 @@ export default function Dashboard() {
         )}
 
         {leaveConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setLeaveConfirm(null);
+            }}
+          >
             <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
               <h3 className="text-[16px] font-[600] text-[#111827] mb-2">Leave team?</h3>
               <p className="text-[14px] text-[#6B7280] mb-6">
@@ -927,7 +943,15 @@ export default function Dashboard() {
         )}
 
         {kickConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setKickConfirm(null);
+            }}
+          >
             <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
               <h3 className="text-[16px] font-[600] text-[#111827] mb-2">Remove member?</h3>
               <p className="text-[14px] text-[#6B7280] mb-6">
@@ -2956,7 +2980,15 @@ export default function Dashboard() {
 
       {/* Modals */}
       {isNewMeetingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsNewMeetingModalOpen(false);
+          }}
+        >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
               <h3 className="text-[16px] font-[600] text-[#111827]">Create New Meeting</h3>
@@ -3021,7 +3053,15 @@ export default function Dashboard() {
       )}
 
       {isJoinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsJoinModalOpen(false);
+          }}
+        >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
               <h3 className="text-[16px] font-[600] text-[#111827]">Join with Code</h3>
@@ -3068,7 +3108,15 @@ export default function Dashboard() {
       )}
 
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsScheduleModalOpen(false);
+          }}
+        >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-[#E5E7EB]">
               <h3 className="text-[16px] font-[600] text-[#111827]">Schedule Meeting</h3>
@@ -3356,7 +3404,15 @@ export default function Dashboard() {
 
       {/* Delete Meeting Modal */}
       {deleteMeetingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setDeleteMeetingId(null);
+          }}
+        >
           <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
             <h3 className="text-[18px] font-[600] text-[#111827] mb-2">Delete Meeting</h3>
             <p className="text-[14px] text-[#4B5563] mb-6">Do you want to delete this meeting?</p>
@@ -3381,7 +3437,15 @@ export default function Dashboard() {
 
       {/* Leave Meeting Modal */}
       {leaveMeetingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLeaveMeetingId(null);
+          }}
+        >
           <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
             <h3 className="text-[18px] font-[600] text-[#111827] mb-2">Leave Meeting</h3>
             <p className="text-[14px] text-[#4B5563] mb-6">Do you want to leave this meeting?</p>

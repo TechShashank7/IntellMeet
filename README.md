@@ -144,9 +144,7 @@ IntellMeet/
 - **Accessibility** — `aria-label`s on all icon-only controls in the meeting room and dashboard, `role="dialog"` + `aria-modal` + Escape-to-close on every modal, corrected heading hierarchy, and WCAG AA–compliant text contrast throughout the dashboard
 
 ### Lighthouse Report
- 
-Tested on the live production deployment (`/dashboard`, authenticated), Chrome DevTools, incognito window:
- 
+  
 | Category | Score |
 |---|---|
 | Performance | 85–98 |

@@ -137,6 +137,27 @@ IntellMeet/
 
 ---
 
+## 🧪 Code Quality & Testing
+ 
+- **Linting & formatting** — ESLint (flat config, TypeScript + React rules) on the frontend, ESLint + `eslint-config-prettier` on the backend; Prettier configured on both
+- **Automated tests** — Vitest covering frontend utility functions (`getInitials`, `getAvatarColor`, `formatDurationSeconds`, etc.); Jest + Supertest covering backend API authorization and validation (task creation, team membership checks, team listing)
+- **Accessibility** — `aria-label`s on all icon-only controls in the meeting room and dashboard, `role="dialog"` + `aria-modal` + Escape-to-close on every modal, corrected heading hierarchy, and WCAG AA–compliant text contrast throughout the dashboard
+
+### Lighthouse Report
+ 
+Tested on the live production deployment (`/dashboard`, authenticated), Chrome DevTools, incognito window:
+ 
+| Category | Score |
+|---|---|
+| Performance | 85–98 |
+| Accessibility | **100** |
+| Best Practices | 100 |
+| SEO | 83 |
+ 
+> **Note on these numbers:** Performance fluctuates noticeably between runs (85–98 observed across repeated tests) — normal run-to-run variance from network conditions and cold starts rather than a code change, so treat it as a range rather than a fixed figure. SEO is intentionally not optimized further, since IntellMeet sits entirely behind authentication and isn't meant to be indexed or discovered via search. Accessibility and Best Practices are the two scores that reflect deliberate work and were verified stable across multiple runs.
+ 
+---
+
 ## 🚀 Getting Started (Local Setup)
 
 ### Prerequisites
@@ -209,7 +230,11 @@ ngrok http 5000
 - [x] **Phase 4** — Live meeting room: chat, closed captions, adaptive video layout, screen share, waiting room, post-call ratings, Kanban board
 - [x] **Phase 5** — recordings list/detail, playback, PDF export, timestamped transcript segments
 - [x] **Phase 6** — PDF download, Slack, and Notion integrations per team
+- [x] **Phase 7** — ESLint + Prettier on both frontend and backend, a minimal automated test suite (Vitest/Jest + Supertest), and a full accessibility pass (ARIA labels, dialog semantics, heading structure, contrast) — see [Code Quality & Testing](#-code-quality--testing)
 
+## In progress / polish
+- [ ] Long-term storage strategy for recording references (Stream URLs are presigned & expiring)
+- [ ] General design pass benchmarked against Zoom/Meet for overall product feel
 ---
 
 ## 👥 Team

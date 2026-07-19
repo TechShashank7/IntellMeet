@@ -2440,9 +2440,9 @@ export default function Dashboard() {
                         />
 
                         <div className="flex-1 pl-2">
-                          <h4 className="text-[15px] font-[600] text-[#111827] mb-1">
+                          <h3 className="text-[15px] font-[600] text-[#111827] mb-1">
                             {meeting.title}
-                          </h4>
+                          </h3>
                           <div className="flex items-center text-[13px] text-[#6B7280] font-[400] gap-1.5">
                             <Calendar size={13} />
                             <span>{timeStr}</span>
@@ -2872,9 +2872,9 @@ export default function Dashboard() {
                               className="text-[#4F46E5] absolute top-[4px] right-[4px]"
                             />
                           </div>
-                          <h4 className="text-[15px] font-[600] text-[#111827] truncate">
+                          <h3 className="text-[15px] font-[600] text-[#111827] truncate">
                             {summary.title}
-                          </h4>
+                          </h3>
                         </div>
                         <span className="bg-[#F3F4F6] text-[#4B5563] text-[12px] font-[400] px-[8px] py-[2px] rounded-[6px] flex-shrink-0">
                           {dateLabel}
